@@ -2,6 +2,7 @@ package com.colingodsey.quic.utils;
 
 import java.util.Random;
 
+//TODO: thread local random
 public class QUICRandom {
     private static final Random r = new Random();
 

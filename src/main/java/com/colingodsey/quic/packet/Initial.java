@@ -8,13 +8,13 @@ import com.colingodsey.quic.packet.components.LongHeader;
 import com.colingodsey.quic.packet.components.LongHeader.Type;
 import com.colingodsey.quic.utils.VariableInt;
 
-public class InitialPacket implements Packet {
+public class Initial implements Packet {
     final LongHeader header;
     final byte[] token;
     final int packetNumber;
     final byte[] payload;
 
-    public InitialPacket(LongHeader header, ByteBuf in) {
+    public Initial(LongHeader header, ByteBuf in) {
         assert header.type == Type.INITIAL;
         this.header = header;
         token = Packet.readBytes(in, VariableInt.readInt(in));
@@ -23,7 +23,7 @@ public class InitialPacket implements Packet {
         payload = Packet.readBytes(in, payloadLength);
     }
 
-    public InitialPacket(int version, byte[] token, int packetNumber,
+    public Initial(int version, byte[] token, int packetNumber,
             byte[] payload, BigInteger sourceID, BigInteger destID) {
         final byte packetNumberBytes = (byte) (Packet.getFixedLengthIntBytes(packetNumber) - 1);
         this.header = new LongHeader(Type.INITIAL, packetNumberBytes, version, sourceID, destID);

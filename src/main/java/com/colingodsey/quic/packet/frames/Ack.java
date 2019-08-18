@@ -10,6 +10,7 @@ import it.unimi.dsi.fastutil.longs.LongSortedSet;
 
 public class Ack implements Frame {
     public static final int PACKET_ID = 0x02;
+    private static final int[] EMPTY_INT_ARR = new int[0];
 
     public final long largestAckd;
     public final long ackDelay;
@@ -89,12 +90,12 @@ public class Ack implements Frame {
             assert acks.size() == gaps.size();
 
             this.ackRangeCount = acks.size();
-            this.gaps = gaps.toArray(new int[0]);
-            this.acks = acks.toArray(new int[0]);
+            this.gaps = gaps.toArray(EMPTY_INT_ARR);
+            this.acks = acks.toArray(EMPTY_INT_ARR);
         } else {
             this.ackRangeCount = 0;
-            this.gaps = new int[0];
-            this.acks = new int[0];
+            this.gaps = null;
+            this.acks = null;
         }
 
         this.largestAckd = largestAckd;
@@ -104,6 +105,14 @@ public class Ack implements Frame {
 
     public void write(ByteBuf out) {
         VariableInt.write(PACKET_ID, out);
+        VariableInt.write(largestAckd, out);
+        VariableInt.write(ackDelay, out);
+        VariableInt.write(ackRangeCount, out);
+        VariableInt.write(firstAck, out);
+        for (int i = 0 ; i < ackRangeCount ; i++) {
+            VariableInt.write(gaps[i], out);
+            VariableInt.write(acks[i], out);
+        }
     }
 
     public void forEach(LongConsumer ack, LongConsumer gap) {

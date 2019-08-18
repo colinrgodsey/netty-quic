@@ -7,6 +7,9 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+
 import java.util.Arrays;
 import java.util.Random;
 
@@ -86,8 +89,9 @@ public class AckTest {
     }
 
     @Test
-    public void randomTestEqual() {
+    public void randomTestThorough() {
         final Random r = new Random(7449);
+        final ByteBuf tmp = Unpooled.buffer();
 
         for (int i = 0 ; i < 5000 ; i++) {
             final LongRBTreeSet ack = new LongRBTreeSet(LongComparators.OPPOSITE_COMPARATOR);
@@ -99,7 +103,8 @@ public class AckTest {
                     gap.add(n);
                 }
             }
-            final Ack res = new Ack(0, ack, 0);
+            new Ack(0, ack, 0).write(tmp.clear());
+            final Ack res = new Ack(tmp);
             res.forEach(n -> ack.remove(n), n -> gap.remove(n));
             assertTrue(ack.isEmpty());
             assertTrue(gap.isEmpty());
