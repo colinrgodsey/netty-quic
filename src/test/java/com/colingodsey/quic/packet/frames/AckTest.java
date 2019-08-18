@@ -36,7 +36,6 @@ public class AckTest {
         final LongRBTreeSet set = new LongRBTreeSet(LongComparators.OPPOSITE_COMPARATOR);
         set.addAll(Arrays.asList(2L, 3L, 4L));
         final Ack ack = new Ack(0, set, 0);
-
         assertEquals(1, ack.ackRangeCount);
         assertEquals(3, ack.firstAck);
     }
@@ -91,15 +90,19 @@ public class AckTest {
         final Random r = new Random(7449);
 
         for (int i = 0 ; i < 5000 ; i++) {
-            final LongRBTreeSet set = new LongRBTreeSet(LongComparators.OPPOSITE_COMPARATOR);
+            final LongRBTreeSet ack = new LongRBTreeSet(LongComparators.OPPOSITE_COMPARATOR);
+            final LongRBTreeSet gap = new LongRBTreeSet();
             for (int n = 1 ; n < 5000 ; n++) {
-                if (r.nextDouble() > 0.5) {
-                    set.add(n);
+                if (r.nextDouble() > 0.5 || n == 4999) { //always add last
+                    ack.add(n);
+                } else {
+                    gap.add(n);
                 }
             }
-            final Ack res = new Ack(0, set, 0);
-            res.forEach(n -> set.remove(n), n -> {});
-            assertTrue(set.isEmpty());
+            final Ack res = new Ack(0, ack, 0);
+            res.forEach(n -> ack.remove(n), n -> gap.remove(n));
+            assertTrue(ack.isEmpty());
+            assertTrue(gap.isEmpty());
         }
     }
 

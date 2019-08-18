@@ -18,6 +18,7 @@ public class Ack implements Frame {
     final int[] gaps;
     final int[] acks;
 
+    //TODO: ECN
     public Ack(ByteBuf in) {
         VariableInt.read(in); //id
         largestAckd = VariableInt.read(in);
@@ -46,7 +47,7 @@ public class Ack implements Frame {
         for (long n : ackSet) {
             assert cursor != largestAckd || n == largestAckd : "largestAckd must be an ack!";
             assert n > lastLargest : "cant ack previously ackd value!";
-            assert n <= cursor : "ack set in wrong order!";
+            assert n <= cursor : "ackSet in wrong order!";
 
             if (firstPhase && n == cursor) {
                 firstAck++;
@@ -75,13 +76,11 @@ public class Ack implements Frame {
                 firstPhase = false;
                 gaps = new IntArrayList();
                 acks = new IntArrayList();
-                gaps.add((int) (cursor - lastLargest));
-                acks.add(0);
             } else {
                 acks.add((int) (rangeStart - cursor));
-                gaps.add((int) (cursor - lastLargest));
-                acks.add(0);
             }
+            gaps.add((int) (cursor - lastLargest));
+            acks.add(0);
         } else if (!firstPhase) {
             acks.add((int) (rangeStart - cursor));
         }
