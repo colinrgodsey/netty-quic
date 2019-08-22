@@ -2,9 +2,10 @@ package com.colingodsey.quic.packet;
 
 import io.netty.buffer.ByteBuf;
 
-import java.math.BigInteger;
 import java.util.ArrayList;
 
+import com.colingodsey.quic.packet.components.ConnectionID;
+import com.colingodsey.quic.packet.components.Header;
 import com.colingodsey.quic.packet.components.LongHeader;
 import com.colingodsey.quic.packet.components.LongHeader.Type;
 import com.colingodsey.quic.utils.QUICRandom;
@@ -25,7 +26,7 @@ public class VersionNegotiation implements Packet {
         }
     }
 
-    public VersionNegotiation(BigInteger sourceID, BigInteger destID, int[] versions) {
+    public VersionNegotiation(ConnectionID sourceID, ConnectionID destID, int[] versions) {
         this.header = new LongHeader(Type.random(), QUICRandom.nextNibble(), 0, sourceID, destID);
         this.versions = versions;
     }
@@ -35,5 +36,9 @@ public class VersionNegotiation implements Packet {
         for (int version : versions) {
             out.writeInt(version);
         }
+    }
+
+    public Header getHeader() {
+        return header;
     }
 }

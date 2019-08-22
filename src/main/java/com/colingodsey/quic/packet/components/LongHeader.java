@@ -2,9 +2,6 @@ package com.colingodsey.quic.packet.components;
 
 import io.netty.buffer.ByteBuf;
 
-import java.math.BigInteger;
-
-import com.colingodsey.quic.packet.Packet;
 import com.colingodsey.quic.utils.QUICRandom;
 
 public class LongHeader implements Header {
@@ -22,8 +19,8 @@ public class LongHeader implements Header {
     public final Type type;
     public final byte header;
     public final int version;
-    public final BigInteger sourceID;
-    public final BigInteger destID;
+    public final ConnectionID sourceID;
+    public final ConnectionID destID;
 
     public LongHeader(ByteBuf in) {
         final int firstByte = in.readUnsignedByte();
@@ -35,12 +32,12 @@ public class LongHeader implements Header {
         type = Type.values()[typeNum];
         header = (byte) (firstByte & 0xF); //bits 4-8
         version = in.readInt();
-        sourceID = Packet.readID(in);
-        destID = Packet.readID(in);
+        sourceID = new ConnectionID(in);
+        destID = new ConnectionID(in);
         check();
     }
 
-    public LongHeader(Type type, byte header, int version, BigInteger sourceID, BigInteger destID) {
+    public LongHeader(Type type, byte header, int version, ConnectionID sourceID, ConnectionID destID) {
         this.type = type;
         this.header = header;
         this.version = version;
@@ -58,15 +55,25 @@ public class LongHeader implements Header {
                 header
         );
         out.writeInt(version);
-        Packet.writeID(sourceID, out);
-        Packet.writeID(destID, out);
+        sourceID.write(out);
+        destID.write(out);
     }
 
     public void check() {
         assert (header >> 4) == 0 : "bad packet header";
     }
 
-    public BigInteger getDestID() {
+    public ConnectionID getDestID() {
         return destID;
+    }
+
+    public String toString() {
+        return "LongHeader{" +
+                "type=" + type +
+                ", header=" + header +
+                ", version=" + version +
+                ", sourceID=" + sourceID +
+                ", destID=" + destID +
+                '}';
     }
 }

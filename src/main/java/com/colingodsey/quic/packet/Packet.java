@@ -2,22 +2,10 @@ package com.colingodsey.quic.packet;
 
 import io.netty.buffer.ByteBuf;
 
-import java.math.BigInteger;
+import com.colingodsey.quic.packet.components.Header;
 
 public interface Packet {
-    static void writeID(BigInteger id, ByteBuf out) {
-        final byte[] bytes = id.toByteArray();
-        assert bytes.length <= 20;
-        out.writeByte(bytes.length);
-        out.writeBytes(bytes);
-    }
-
-    static BigInteger readID(ByteBuf in) {
-        final int length = in.readUnsignedByte();
-        final byte[] bytes = new byte[length];
-        in.readBytes(bytes);
-        return new BigInteger(bytes);
-    }
+    Header getHeader();
 
     static byte[] readBytes(ByteBuf in, int length) {
         final byte[] out = new byte[length];

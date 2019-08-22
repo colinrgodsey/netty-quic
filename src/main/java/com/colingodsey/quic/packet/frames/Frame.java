@@ -17,6 +17,7 @@ public interface Frame {
                 return Ping.read(in);
             case 0x02: // ACK
             case 0x03:
+                return new Ack(in);
             case 0x04: // RESET_STREAM
             case 0x05: // STOP_SENDING
             case 0x06: // CRYPTO
@@ -47,5 +48,13 @@ public interface Frame {
         return null;
     }
 
+    static void verifyPacketId(ByteBuf in, int packetID) {
+        if (VariableInt.readInt(in) != packetID) {
+            throw new IllegalArgumentException("Expecting packetID: " + packetID);
+        }
+    }
+
     void write(ByteBuf out);
+
+    interface Initial extends Frame {}
 }

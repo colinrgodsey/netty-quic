@@ -4,13 +4,12 @@ import io.netty.buffer.ByteBuf;
 
 import com.colingodsey.quic.utils.VariableInt;
 
-public class Padding implements Frame {
+public class Padding implements Frame, Frame.Initial {
     public static final int PACKET_ID = 0x00;
     public static final Padding INSTANCE = new Padding();
 
     public static final Padding read(ByteBuf in) {
-        final long packetId = VariableInt.read(in);
-        assert packetId == PACKET_ID;
+        Frame.verifyPacketId(in, PACKET_ID);
         return INSTANCE;
     }
 

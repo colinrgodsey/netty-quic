@@ -9,8 +9,7 @@ public class Ping implements Frame {
     public static final Ping INSTANCE = new Ping();
 
     public static final Ping read(ByteBuf in) {
-        final long packetId = VariableInt.read(in);
-        assert packetId == PACKET_ID;
+        Frame.verifyPacketId(in, PACKET_ID);
         return INSTANCE;
     }
 

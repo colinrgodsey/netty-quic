@@ -8,7 +8,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongConsumer;
 import it.unimi.dsi.fastutil.longs.LongSortedSet;
 
-public class Ack implements Frame {
+public class Ack implements Frame, Frame.Initial {
     public static final int PACKET_ID = 0x02;
     private static final int[] EMPTY_INT_ARR = new int[0];
 
@@ -48,7 +48,10 @@ public class Ack implements Frame {
         for (long n : ackSet) {
             assert cursor != largestAckd || n == largestAckd : "largestAckd must be an ack!";
             assert n > lastLargest : "cant ack previously ackd value!";
-            assert n <= cursor : "ackSet in wrong order!";
+
+            if (n > cursor) {
+                throw new IllegalArgumentException("ackSet must be descending order");
+            }
 
             if (firstPhase && n == cursor) {
                 firstAck++;

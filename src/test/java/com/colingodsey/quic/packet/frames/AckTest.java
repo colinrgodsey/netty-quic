@@ -11,7 +11,9 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Random;
+import java.util.Set;
 
 public class AckTest {
     @Test
@@ -79,7 +81,7 @@ public class AckTest {
         assertEquals(2, ack.firstAck);
     }
 
-    @Test(expected = AssertionError.class)
+    @Test(expected = IllegalArgumentException.class)
     public void badOrder() {
         final LongRBTreeSet set = new LongRBTreeSet(LongComparators.NATURAL_COMPARATOR);
         set.addAll(Arrays.asList(1L, 2L, 3L, 10L, 11L, 12L, 14L, 15L, 20L, 21L));
@@ -95,17 +97,16 @@ public class AckTest {
 
         for (int i = 0 ; i < 5000 ; i++) {
             final LongRBTreeSet ack = new LongRBTreeSet(LongComparators.OPPOSITE_COMPARATOR);
-            final LongRBTreeSet gap = new LongRBTreeSet();
+            final Set<Long> gap = new HashSet<>();
             for (int n = 1 ; n < 5000 ; n++) {
                 if (r.nextDouble() > 0.5 || n == 4999) { //always add last
                     ack.add(n);
                 } else {
-                    gap.add(n);
+                    gap.add((long) n);
                 }
             }
             new Ack(0, ack, 0).write(tmp.clear());
-            final Ack res = new Ack(tmp);
-            res.forEach(n -> ack.remove(n), n -> gap.remove(n));
+            new Ack(tmp).forEach(n -> ack.remove(n), n -> gap.remove(n));
             assertTrue(ack.isEmpty());
             assertTrue(gap.isEmpty());
         }
@@ -122,8 +123,7 @@ public class AckTest {
                     set.add(n);
                 }
             }
-            final Ack res = new Ack(0, set, 0);
-            res.forEach(n -> set.remove(n), n -> {});
+            new Ack(0, set, 0).forEach(n -> set.remove(n), n -> {});
             assertTrue(set.isEmpty());
         }
     }
@@ -139,8 +139,7 @@ public class AckTest {
                     set.add(n);
                 }
             }
-            final Ack res = new Ack(0, set, 0);
-            res.forEach(n -> set.remove(n), n -> {});
+            new Ack(0, set, 0).forEach(n -> set.remove(n), n -> {});
             assertTrue(set.isEmpty());
         }
     }
