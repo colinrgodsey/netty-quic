@@ -1,68 +1,102 @@
 package com.colingodsey.quic.crypto.context;
 
 import java.math.BigInteger;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
+import java.nio.ByteBuffer;
+import java.security.GeneralSecurityException;
 import java.security.spec.AlgorithmParameterSpec;
 import java.util.Arrays;
 
-import com.colingodsey.quic.crypto.DerivedSecrets;
+import at.favre.lib.crypto.HKDF;
+
 import com.colingodsey.quic.packet.components.ConnectionID;
 
-import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-//not thread safe
-public class TLS_AES_128_GCM_SHA256 extends Context {
-    final ConnectionID connectionID;
-    final Cipher headerCipher;
-    final KeyStack clientKeys;
-    final KeyStack serverKeys;
+public class TLS_AES_128_GCM_SHA256 extends CryptoContext {
+    static final int HASH_BYTES = 32;
+    static final int GCM_BITS = 128;
+    static final HKDF hkdf = HKDF.fromHmacSha256();
 
-    public TLS_AES_128_GCM_SHA256(ConnectionID connectionID)
-            throws NoSuchPaddingException, NoSuchAlgorithmException {
-        this.connectionID = connectionID;
-        this.headerCipher = Cipher.getInstance("AES/GCM/NoPadding");
-        final DerivedSecrets secrets = new DerivedSecrets(connectionID);
-        clientKeys = new KeyStack(secrets.clientSecrets);
-        serverKeys = new KeyStack(secrets.serverSecrets);
+    final EndpointFunctions clientKeys;
+    final EndpointFunctions serverKeys;
+
+    /**
+     * Crypto context used for the initial phase, derived from the connection ID.
+     *
+     * @param connectionID ID used to derive the crypto keys.
+     * @throws GeneralSecurityException
+     */
+    public TLS_AES_128_GCM_SHA256(ConnectionID connectionID) throws GeneralSecurityException {
+        this(hkdf.extract(QUIC_V1_INITIAL_SALT, connectionID.getBytes()));
     }
 
-    public KeyStack getClient() {
+    /**
+     * Crypto context used for the handshake and 1-RTT phases.
+     *
+     * For the handshake phase, the handshake secret from the TLS context should be used.
+     * For the 1-RTT phase, the master secret from the TLS context should be used.
+     *
+     * @param masterSecret Secret key obtained from the appropriate TLS phase.
+     * @throws GeneralSecurityException
+     */
+    public TLS_AES_128_GCM_SHA256(SecretKey masterSecret) throws GeneralSecurityException {
+        this(masterSecret.getEncoded());
+    }
+
+    TLS_AES_128_GCM_SHA256(byte[] masterSecret) throws GeneralSecurityException {
+        clientKeys = new EndpointFunctions(hkdf.expand(masterSecret, CLIENT_IN_LABEL, HASH_BYTES));
+        serverKeys = new EndpointFunctions(hkdf.expand(masterSecret, SERVER_IN_LABEL, HASH_BYTES));
+    }
+
+    public EndpointFunctions getClient() {
         return clientKeys;
     }
 
-    public KeyStack getServer() {
+    public EndpointFunctions getServer() {
         return serverKeys;
     }
 
-    class KeyStack extends IKeyStack {
+    //TODO: abstract these methods out
+    class EndpointFunctions extends CryptoContext.EndpointFunctions {
         final SecretKey key;
-        final DerivedSecrets.PacketSecrets secrets;
+        final SecretKey hpKey;
+        final IvParameterSpec iv;
+        final Cipher payloadCipher;
+        final Cipher headerCipher;
 
-        KeyStack(DerivedSecrets.PacketSecrets secrets) {
-            key = new SecretKeySpec(secrets.key, "AES");
-            this.secrets = secrets;
+        EndpointFunctions(byte[] secret) throws GeneralSecurityException {
+            iv = new IvParameterSpec(hkdf.expand(secret, IV_LABEL, IV_LENGTH));
+            key = new SecretKeySpec(hkdf.expand(secret, KEY_LABEL, KEY_LENGTH), "AES");
+            hpKey = new SecretKeySpec(hkdf.expand(secret, HP_LABEL, KEY_LENGTH), "AES");
+            payloadCipher = Cipher.getInstance("AES/GCM/NoPadding");
+            headerCipher = Cipher.getInstance("AES/ECB/NoPadding");
+            headerCipher.init(Cipher.ENCRYPT_MODE, hpKey);
         }
 
-        public byte[] encryptPayload(byte[] header, byte[] payload, int packetNumber)
-                throws InvalidAlgorithmParameterException, InvalidKeyException,
-                BadPaddingException, IllegalBlockSizeException {
-            headerCipher.init(Cipher.ENCRYPT_MODE, key, getAlgoParam(packetNumber));
-            headerCipher.updateAAD(header);
-            return headerCipher.doFinal(Arrays.copyOf(payload, 1163));
+        AlgorithmParameterSpec createIV(int packetNum) {
+            final byte[] nonce = iv.getIV();
+            final byte[] pnBytes = BigInteger.valueOf(packetNum).toByteArray();
+            final int offset = nonce.length - pnBytes.length;
+            for (int i = 0 ; i < pnBytes.length ; i++) {
+                nonce[offset + i] ^= pnBytes[i];
+            }
+            return new GCMParameterSpec(GCM_BITS, nonce);
         }
 
-        AlgorithmParameterSpec getAlgoParam(int packetNum) {
-            //i dont trust this, but lets use it for now
-            BigInteger nonceInt = new BigInteger(secrets.iv).xor(BigInteger.valueOf(packetNum)); // packet num
-            return new GCMParameterSpec(128, nonceInt.toByteArray());
+        SecretKey getKey() {
+            return key;
+        }
+
+        Cipher getPayloadCipher() {
+            return payloadCipher;
+        }
+
+        Cipher getHeaderCipher() {
+            return headerCipher;
         }
     }
 }

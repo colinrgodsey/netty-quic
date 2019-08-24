@@ -1,6 +1,8 @@
 package com.colingodsey.quic.packet.components;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.Unpooled;
 
 import com.colingodsey.quic.utils.QUICRandom;
 
@@ -59,6 +61,10 @@ public class LongHeader implements Header {
         destID.write(out);
     }
 
+    public int length() {
+        return 1 + 4 + sourceID.length() + destID.length();
+    }
+
     public void check() {
         assert (header >> 4) == 0 : "bad packet header";
     }
@@ -71,7 +77,7 @@ public class LongHeader implements Header {
         return "LongHeader{" +
                 "type=" + type +
                 ", header=" + header +
-                ", version=" + version +
+                ", version=" + ByteBufUtil.hexDump(Unpooled.buffer().writeInt(version)) +
                 ", sourceID=" + sourceID +
                 ", destID=" + destID +
                 '}';

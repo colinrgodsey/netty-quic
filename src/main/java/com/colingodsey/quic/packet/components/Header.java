@@ -14,4 +14,8 @@ public interface Header {
     }
 
     ConnectionID getDestID();
+
+    default boolean isLong() {
+        return this instanceof LongHeader;
+    }
 }

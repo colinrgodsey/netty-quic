@@ -2,15 +2,16 @@ package com.colingodsey.quic.packet.frames;
 
 import io.netty.buffer.ByteBuf;
 
+import com.colingodsey.quic.packet.components.LongHeader;
 import com.colingodsey.quic.utils.VariableInt;
 
 public interface Frame {
     static Frame readFrame(ByteBuf in) {
         final int readerIndex = in.readerIndex();
-        final int packetId = VariableInt.readInt(in);
+        final int frameId = VariableInt.readInt(in);
         in.readerIndex(readerIndex);
 
-        switch (packetId) {
+        switch (frameId) {
             case Padding.PACKET_ID: // PADDING
                 return Padding.read(in);
             case 0x01: // PING
@@ -21,6 +22,7 @@ public interface Frame {
             case 0x04: // RESET_STREAM
             case 0x05: // STOP_SENDING
             case 0x06: // CRYPTO
+                return new Crypto(in);
             case 0x07: // NEW_TOKEN
             case 0x08: // STREAM
             case 0x09:
@@ -44,6 +46,7 @@ public interface Frame {
             case 0x1B: // PATH_RESPONSE
             case 0x1C: // CONNECTION_CLOSE
             case 0x1D:
+                throw new RuntimeException("Unknown frame ID " + frameId);
         }
         return null;
     }
@@ -55,6 +58,10 @@ public interface Frame {
     }
 
     void write(ByteBuf out);
+
+    default LongHeader.Type getLevel() {
+        return null;
+    }
 
     interface Initial extends Frame {}
 }

@@ -1,136 +1,33 @@
 package com.colingodsey.quic.crypto;
 
-import static com.colingodsey.quic.utils.Utils.h2ba;
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
-import java.io.FileInputStream;
 import java.nio.ByteBuffer;
-import java.security.KeyStore;
 import java.util.Arrays;
 
-import com.colingodsey.quic.packet.components.ConnectionID;
+import com.colingodsey.quic.crypto.context.TLS_AES_128_GCM_SHA256;
 
-import com.colingodsey.quic.utils.QUICRandom;
-import javax.crypto.Cipher;
-import javax.crypto.spec.SecretKeySpec;
-import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.SSLContext;
+import com.colingodsey.quic.utils.TestSSLContext;
+import javax.crypto.SecretKey;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLEngineResult.HandshakeStatus;
 import javax.net.ssl.SSLSession;
-import javax.net.ssl.TrustManagerFactory;
 
 import org.junit.Test;
 import org.openjsse.javax.net.ssl.SSLParameters;
 
 public class CryptoTest {
-    final String connIDStr = "8394c8f03e515708";
-    final ConnectionID connID = new ConnectionID(h2ba(connIDStr));
-    final DerivedSecrets secrets = new DerivedSecrets(connID);
-
-    final KeyManagerFactory kmf;
-    final TrustManagerFactory tmf;
-    final SSLContext context;
-    {
-        TLS.init();
-
-        try {
-            KeyStore ks = KeyStore.getInstance("JKS");
-            KeyStore ts = KeyStore.getInstance("JKS");
-
-            char[] passphrase = "passphrase".toCharArray();
-
-            ks.load(new FileInputStream(Thread.currentThread().getContextClassLoader().getResource("tlstest/keystore").getFile()), passphrase);
-            ts.load(new FileInputStream(Thread.currentThread().getContextClassLoader().getResource("tlstest/truststore").getFile()), passphrase);
-
-            kmf = KeyManagerFactory.getInstance("SunX509");
-            kmf.init(ks, passphrase);
-
-            tmf = TrustManagerFactory.getInstance("SunX509");
-            tmf.init(ts);
-
-            context = SSLContext.getInstance("TLS");
-            context.init(kmf.getKeyManagers(), tmf.getTrustManagers(), QUICRandom.getSecureRandom());
-        } catch (Exception e) {
-            throw new RuntimeException("failed to load test materials", e);
-        }
-    }
-
-    //is this example just bad?
-    /*@Test
-    public void initialProtectionTest2() throws Exception {
-        byte[] sample = h2ba("65f354ebb400418b614f73765009c016");
-        SecretKeySpec skeySpec = new SecretKeySpec(secrets.clientSecrets.hp, "AES");
-        Cipher cipher = Cipher.getInstance("AES/ECB/NoPadding");
-
-        cipher.init(Cipher.ENCRYPT_MODE, skeySpec);
-
-        assertArrayEquals(
-                h2ba("519bd343ff"),
-                Arrays.copyOf(cipher.doFinal(sample), 5));
-    }*/
-
-    @Test
-    public void initialProtectionTest1() throws Exception {
-        byte[] sample = h2ba("da5c83732bb0d8c945563b6ba1a57a5f");
-        SecretKeySpec skeySpec = new SecretKeySpec(h2ba("3271d12d0c6e3faac0e1e8a29294146c"), "AES");
-        Cipher cipher = Cipher.getInstance("AES/ECB/NoPadding");
-
-        cipher.init(Cipher.ENCRYPT_MODE, skeySpec);
-
-        assertArrayEquals(
-                h2ba("0ed450ec84"),
-                Arrays.copyOf(cipher.doFinal(sample), 5));
-    }
-
     @Test
     public void jvmTest() {
-        SSLEngine engine = context.createSSLEngine();
+        SSLEngine engine = TestSSLContext.sslContext.createSSLEngine();
         System.out.println(Arrays.asList(engine.getEnabledCipherSuites()));
         System.out.println(Arrays.asList(engine.getEnabledProtocols()));
 
         //TSL 1.3 is java 11 only
         assertTrue("This JVM does not support TLSv1.3",
                 Arrays.asList(engine.getEnabledCipherSuites()).contains("TLS_AES_128_GCM_SHA256"));
-    }
-
-    @Test
-    public void secretsTest() {
-        assertArrayEquals(
-                h2ba(connIDStr),
-                connID.getBytes());
-        assertArrayEquals(
-                h2ba("524e374c6da8cf8b496f4bcb696783507aafee6198b202b4bc823ebf7514a423"),
-                secrets.initialSecret);
-        assertArrayEquals(
-                h2ba("fda3953aecc040e48b34e27ef87de3a6098ecf0e38b7e032c5c57bcbd5975b84"),
-                secrets.clientInitialSecret);
-        assertArrayEquals(
-                h2ba("554366b81912ff90be41f17e8022213090ab17d8149179bcadf222f29ff2ddd5"),
-                secrets.serverInitialSecret);
-
-        assertArrayEquals(
-                h2ba("af7fd7efebd21878ff66811248983694"),
-                secrets.clientSecrets.key);
-        assertArrayEquals(
-                h2ba("8681359410a70bb9c92f0420"),
-                secrets.clientSecrets.iv);
-        assertArrayEquals(
-                h2ba("a980b8b4fb7d9fbc13e814c23164253d"),
-                secrets.clientSecrets.hp);
-
-        assertArrayEquals(
-                h2ba("5d51da9ee897a21b2659ccc7e5bfa577"),
-                secrets.serverSecrets.key);
-        assertArrayEquals(
-                h2ba("5e5ae651fd1e8495af13508b"),
-                secrets.serverSecrets.iv);
-        assertArrayEquals(
-                h2ba("a8ed82e6664f865aedf6106943f95fb8"),
-                secrets.serverSecrets.hp);
     }
 
     void setQuicParam(SSLEngine engine, String name, long value) {
@@ -141,8 +38,8 @@ public class CryptoTest {
 
     @Test
     public void rawHandshake() throws Exception {
-        SSLEngine client = context.createSSLEngine("dummy.example.com", 80);
-        SSLEngine server = context.createSSLEngine();
+        SSLEngine client = TestSSLContext.sslContext.createSSLEngine("dummy.example.com", 80);
+        SSLEngine server = TestSSLContext.sslContext.createSSLEngine();
 
         client.setUseClientMode(true);
         server.setUseClientMode(false);
@@ -175,8 +72,17 @@ public class CryptoTest {
             }
 
             System.out.println("===========");
+            int clientOutBytes = clientOut.remaining();
+            int serverOutBytes = serverOut.remaining();
             checkStatus(client.wrap(clientOut, cToS), client);
             checkStatus(server.wrap(serverOut, sToC), server);
+
+            if (clientOutBytes != clientOut.remaining()) {
+                System.out.println("Wrote client data bytes: " + (clientOutBytes - clientOut.remaining()));
+            }
+            if (serverOutBytes != serverOut.remaining()) {
+                System.out.println("Wrote server data bytes: " + (serverOutBytes - serverOut.remaining()));
+            }
 
             cToS.flip();
             sToC.flip();
@@ -208,6 +114,12 @@ public class CryptoTest {
         assertTrue(client.isOutboundDone());
         assertTrue(server.isInboundDone());
         assertEquals("TLS_AES_128_GCM_SHA256", client.getSession().getCipherSuite());
+
+        new TLS_AES_128_GCM_SHA256((SecretKey) client.getSession().getValue("tls13_handshake_secret"));
+        new TLS_AES_128_GCM_SHA256((SecretKey) server.getSession().getValue("tls13_handshake_secret"));
+
+        new TLS_AES_128_GCM_SHA256((SecretKey) client.getSession().getValue("tls13_master_secret"));
+        new TLS_AES_128_GCM_SHA256((SecretKey) server.getSession().getValue("tls13_master_secret"));
 
         System.out.println("Client session values: ");
         for (String key : client.getSession().getValueNames()) {

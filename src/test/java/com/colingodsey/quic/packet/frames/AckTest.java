@@ -16,6 +16,9 @@ import java.util.Random;
 import java.util.Set;
 
 public class AckTest {
+    final int TEST_RUNS = 5000;
+    final int TEST_VALUES = 3000;
+
     @Test
     public void firstAck1() {
         final LongRBTreeSet set = new LongRBTreeSet(LongComparators.OPPOSITE_COMPARATOR);
@@ -95,11 +98,11 @@ public class AckTest {
         final Random r = new Random(7449);
         final ByteBuf tmp = Unpooled.buffer();
 
-        for (int i = 0 ; i < 5000 ; i++) {
+        for (int i = 0 ; i < TEST_RUNS ; i++) {
             final LongRBTreeSet ack = new LongRBTreeSet(LongComparators.OPPOSITE_COMPARATOR);
             final Set<Long> gap = new HashSet<>();
-            for (int n = 1 ; n < 5000 ; n++) {
-                if (r.nextDouble() > 0.5 || n == 4999) { //always add last
+            for (int n = 1 ; n < TEST_VALUES ; n++) {
+                if (r.nextDouble() > 0.5 || n == (TEST_VALUES - 1)) { //always add last
                     ack.add(n);
                 } else {
                     gap.add((long) n);
@@ -116,9 +119,9 @@ public class AckTest {
     public void randomTestSparse() {
         final Random r = new Random(7448);
 
-        for (int i = 0 ; i < 5000 ; i++) {
+        for (int i = 0 ; i < TEST_RUNS ; i++) {
             final LongRBTreeSet set = new LongRBTreeSet(LongComparators.OPPOSITE_COMPARATOR);
-            for (int n = 1 ; n < 5000 ; n++) {
+            for (int n = 1 ; n < TEST_VALUES ; n++) {
                 if (r.nextDouble() > 0.8) {
                     set.add(n);
                 }
@@ -132,9 +135,9 @@ public class AckTest {
     public void randomTestDense() {
         final Random r = new Random(7447);
 
-        for (int i = 0 ; i < 5000 ; i++) {
+        for (int i = 0 ; i < TEST_RUNS ; i++) {
             final LongRBTreeSet set = new LongRBTreeSet(LongComparators.OPPOSITE_COMPARATOR);
-            for (int n = 1 ; n < 5000 ; n++) {
+            for (int n = 1 ; n < TEST_VALUES ; n++) {
                 if (r.nextDouble() > 0.2) {
                     set.add(n);
                 }

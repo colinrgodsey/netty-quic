@@ -29,6 +29,10 @@ public final class ConnectionID {
         return bytes.clone();
     }
 
+    public int length() {
+        return bytes.length + 1;
+    }
+
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -48,8 +52,6 @@ public final class ConnectionID {
     }
 
     public String toString() {
-        return "ID{" +
-                "bytes=" + ByteBufUtil.hexDump(bytes) +
-                '}';
+        return "ConnectionID{" + ByteBufUtil.hexDump(bytes) + '}';
     }
 }
