@@ -7,6 +7,10 @@ import com.colingodsey.quic.utils.VariableInt;
 
 public interface Frame {
     static Frame readFrame(ByteBuf in) {
+        return readFrame(in, null);
+    }
+
+    static Frame readFrame(ByteBuf in, LongHeader.Type level) {
         final int readerIndex = in.readerIndex();
         final int frameId = VariableInt.readInt(in);
         in.readerIndex(readerIndex);
@@ -14,15 +18,15 @@ public interface Frame {
         switch (frameId) {
             case Padding.PACKET_ID: // PADDING
                 return Padding.read(in);
-            case 0x01: // PING
+            case Ping.PACKET_ID: // PING
                 return Ping.read(in);
-            case 0x02: // ACK
-            case 0x03:
+            case Ack.PACKET_ID: // ACK
+            case Ack.PACKET_ID + 1:
                 return new Ack(in);
-            case 0x04: // RESET_STREAM
-            case 0x05: // STOP_SENDING
-            case 0x06: // CRYPTO
-                return new Crypto(in);
+            //case 0x04: // RESET_STREAM
+            //case 0x05: // STOP_SENDING
+            case Crypto.PACKET_ID: // CRYPTO
+                return new Crypto(in, level);
             case 0x07: // NEW_TOKEN
             case 0x08: // STREAM
             case 0x09:
@@ -64,4 +68,5 @@ public interface Frame {
     }
 
     interface Initial extends Frame {}
+    interface Handshake extends Frame {}
 }

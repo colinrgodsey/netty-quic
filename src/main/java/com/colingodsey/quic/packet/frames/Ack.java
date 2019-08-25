@@ -8,7 +8,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongConsumer;
 import it.unimi.dsi.fastutil.longs.LongSortedSet;
 
-public class Ack implements Frame, Frame.Initial {
+public class Ack implements Frame, Frame.Initial, Frame.Handshake {
     public static final int PACKET_ID = 0x02;
     private static final int[] EMPTY_INT_ARR = new int[0];
 

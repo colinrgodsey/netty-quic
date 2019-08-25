@@ -1,5 +1,9 @@
 package com.colingodsey.quic.crypto.pipeline;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotEquals;
+
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
@@ -14,7 +18,10 @@ import io.netty.channel.socket.nio.NioDatagramChannel;
 
 import java.net.InetSocketAddress;
 
+import com.colingodsey.quic.QUIC;
+import com.colingodsey.quic.channel.DatagramChannelProxy;
 import com.colingodsey.quic.utils.TestSSLContext;
+
 import org.junit.Test;
 
 public class JSSEHandlerTest {
@@ -25,7 +32,7 @@ public class JSSEHandlerTest {
     public void rawHandshake() throws Exception {
         Channel server = new Bootstrap()
         .group(ioGroup)
-        .channel(NioDatagramChannel.class)
+        .channelFactory(() -> new DatagramChannelProxy(NioDatagramChannel.class))
         .handler(new ChannelInitializer<Channel>() {
             protected void initChannel(Channel ch) throws Exception {
                 ch.pipeline()
@@ -55,7 +62,7 @@ public class JSSEHandlerTest {
 
         Channel client = new Bootstrap()
         .group(ioGroup)
-        .channel(NioDatagramChannel.class)
+        .channelFactory(() -> new DatagramChannelProxy(NioDatagramChannel.class))
         .handler(new ChannelInitializer<Channel>() {
             protected void initChannel(Channel ch) throws Exception {
                 ch.pipeline()
@@ -72,8 +79,21 @@ public class JSSEHandlerTest {
             }
         }).connect(localhost).sync().channel();
 
+        //normally fired elsewhere
+        //server.pipeline().fireChannelActive();
+        //client.pipeline().fireChannelActive();
+
         try {
-            Thread.sleep(2000);
+            int maxS = 10;
+            while (QUIC.config(client).getMasterContext() == null || QUIC.config(server).getMasterContext() == null) {
+                if (maxS-- <= 0) {
+                    throw new RuntimeException("timeout getting handshake keys");
+                }
+                Thread.sleep(1000);
+            }
+
+            assertNotNull(QUIC.config(client).getHandshakeContext());
+            assertNotNull(QUIC.config(server).getHandshakeContext());
         } finally {
             server.close().sync();
             client.close().sync();

@@ -115,11 +115,11 @@ public class CryptoTest {
         assertTrue(server.isInboundDone());
         assertEquals("TLS_AES_128_GCM_SHA256", client.getSession().getCipherSuite());
 
-        new TLS_AES_128_GCM_SHA256((SecretKey) client.getSession().getValue("tls13_handshake_secret"));
+        /*new TLS_AES_128_GCM_SHA256((SecretKey) client.getSession().getValue("tls13_handshake_secret"));
         new TLS_AES_128_GCM_SHA256((SecretKey) server.getSession().getValue("tls13_handshake_secret"));
 
         new TLS_AES_128_GCM_SHA256((SecretKey) client.getSession().getValue("tls13_master_secret"));
-        new TLS_AES_128_GCM_SHA256((SecretKey) server.getSession().getValue("tls13_master_secret"));
+        new TLS_AES_128_GCM_SHA256((SecretKey) server.getSession().getValue("tls13_master_secret"));*/
 
         System.out.println("Client session values: ");
         for (String key : client.getSession().getValueNames()) {

@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import com.colingodsey.quic.crypto.context.CryptoContext.EndpointFunctions;
+import com.colingodsey.quic.crypto.context.CryptoContext;
 import com.colingodsey.quic.packet.components.ConnectionID;
 import com.colingodsey.quic.packet.components.LongHeader;
 import com.colingodsey.quic.packet.components.LongHeader.Type;
@@ -65,7 +65,7 @@ public class Initial extends AbstractReferenceCounted implements Packet {
         }
     }
 
-    public byte[] produceEncrypted(EndpointFunctions ctx) {
+    public byte[] produceEncrypted(CryptoContext ctx) {
         final byte[] payloadData = Utils.createBytes(buf -> {
             writePayload(buf);
             if (buf.readableBytes() < PAD_PAYLOAD_TO) {

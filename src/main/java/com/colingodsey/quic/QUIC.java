@@ -1,21 +1,33 @@
 package com.colingodsey.quic;
 
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelConfig;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOption;
 
+import com.colingodsey.quic.crypto.context.CryptoContext;
+
 public class QUIC {
-    /*public static final ChannelOption<DerivedSecrets> INITIAL_SECRETS = ChannelOption.valueOf("QUIC_INITIAL_SECRETS");
-    public static final ChannelOption<DerivedSecrets> HANDSHAKE_SECRETS = ChannelOption.valueOf("QUIC_HANDSHAKE_SECRETS");
-    public static final ChannelOption<DerivedSecrets> TLS_SECRETS = ChannelOption.valueOf("QUIC_TLS_SECRETS");*/
+    /*public static final ChannelOption<CryptoContext> INITIAL_SECRETS = ChannelOption.valueOf("QUIC_INITIAL_SECRETS");
+    public static final ChannelOption<CryptoContext> HANDSHAKE_SECRETS = ChannelOption.valueOf("QUIC_HANDSHAKE_SECRETS");
+    public static final ChannelOption<CryptoContext> MASTER_SECRETS = ChannelOption.valueOf("QUIC_MASTER_SECRETS");*/
 
     public interface Config extends ChannelConfig {
-        /*DerivedSecrets getInitialSecrets();
-        void setInitialSecrets(DerivedSecrets secrets);
+        CryptoContext getInitialContext();
+        void setInitialContext(CryptoContext Context);
 
-        DerivedSecrets getHandshakeSecrets();
-        void setHandshakeSecrets(DerivedSecrets secrets);
+        CryptoContext getHandshakeContext();
+        void setHandshakeContext(CryptoContext Context);
 
-        DerivedSecrets getTLSSecrets();
-        void setTLSSecrets(DerivedSecrets secrets);*/
+        CryptoContext getMasterContext();
+        void setMasterContext(CryptoContext Context);
+    }
+
+    public static Config config(ChannelHandlerContext ctx) {
+        return config(ctx.channel());
+    }
+
+    public static Config config(Channel channel) {
+        return (Config) channel.config();
     }
 }

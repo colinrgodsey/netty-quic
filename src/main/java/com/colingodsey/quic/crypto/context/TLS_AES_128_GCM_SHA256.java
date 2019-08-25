@@ -1,10 +1,8 @@
 package com.colingodsey.quic.crypto.context;
 
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
 import java.security.GeneralSecurityException;
 import java.security.spec.AlgorithmParameterSpec;
-import java.util.Arrays;
 
 import at.favre.lib.crypto.HKDF;
 
@@ -17,86 +15,71 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 public class TLS_AES_128_GCM_SHA256 extends CryptoContext {
-    static final int HASH_BYTES = 32;
     static final int GCM_BITS = 128;
     static final HKDF hkdf = HKDF.fromHmacSha256();
 
-    final EndpointFunctions clientKeys;
-    final EndpointFunctions serverKeys;
+    final SecretKey wPayload;
+    final SecretKey wHP;
+    final IvParameterSpec wIV;
+    final Cipher wPayloadCipher;
+    final Cipher wHeaderCipher;
 
-    /**
-     * Crypto context used for the initial phase, derived from the connection ID.
-     *
-     * @param connectionID ID used to derive the crypto keys.
-     * @throws GeneralSecurityException
-     */
-    public TLS_AES_128_GCM_SHA256(ConnectionID connectionID) throws GeneralSecurityException {
-        this(hkdf.extract(QUIC_V1_INITIAL_SALT, connectionID.getBytes()));
+    final SecretKey rPayload;
+    final SecretKey rHP;
+    final IvParameterSpec rIV;
+
+    TLS_AES_128_GCM_SHA256(ConnectionID connectionID, boolean isServer) throws GeneralSecurityException {
+        this(new SecretKeySpec(
+                hkdf.extract(QUIC_V1_INITIAL_SALT, connectionID.getBytes()), "HKDF"), isServer);
     }
 
-    /**
-     * Crypto context used for the handshake and 1-RTT phases.
-     *
-     * For the handshake phase, the handshake secret from the TLS context should be used.
-     * For the 1-RTT phase, the master secret from the TLS context should be used.
-     *
-     * @param masterSecret Secret key obtained from the appropriate TLS phase.
-     * @throws GeneralSecurityException
-     */
-    public TLS_AES_128_GCM_SHA256(SecretKey masterSecret) throws GeneralSecurityException {
-        this(masterSecret.getEncoded());
+    private TLS_AES_128_GCM_SHA256(SecretKey masterSecret, boolean isServer) throws GeneralSecurityException {
+        this(
+                expandKey(masterSecret, !isServer ? QUIC_CLIENT_IN_LABEL : QUIC_SERVER_IN_LABEL),
+                expandKey(masterSecret, isServer  ? QUIC_CLIENT_IN_LABEL : QUIC_SERVER_IN_LABEL)
+        );
     }
 
-    TLS_AES_128_GCM_SHA256(byte[] masterSecret) throws GeneralSecurityException {
-        clientKeys = new EndpointFunctions(hkdf.expand(masterSecret, CLIENT_IN_LABEL, HASH_BYTES));
-        serverKeys = new EndpointFunctions(hkdf.expand(masterSecret, SERVER_IN_LABEL, HASH_BYTES));
+    TLS_AES_128_GCM_SHA256(SecretKey writeKey, SecretKey readKey) throws GeneralSecurityException {
+        wPayload = expandKey(writeKey, QUIC_KEY_LABEL);
+        wHP = expandKey(writeKey, QUIC_HP_LABEL);
+        wIV = expandIV(writeKey, QUIC_IV_LABEL);
+        wPayloadCipher = Cipher.getInstance("AES/GCM/NoPadding");
+        wHeaderCipher = Cipher.getInstance("AES/ECB/NoPadding");
+        wHeaderCipher.init(Cipher.ENCRYPT_MODE, wHP);
+
+        rPayload = expandKey(readKey, QUIC_KEY_LABEL);
+        rHP = expandKey(readKey, QUIC_HP_LABEL);
+        rIV = expandIV(readKey, QUIC_IV_LABEL);
     }
 
-    public EndpointFunctions getClient() {
-        return clientKeys;
+    AlgorithmParameterSpec createIV(int packetNum, boolean isWrite) {
+        final byte[] nonce = isWrite ? wIV.getIV() : rIV.getIV();
+        final byte[] pnBytes = BigInteger.valueOf(packetNum).toByteArray();
+        final int offset = nonce.length - pnBytes.length;
+        for (int i = 0 ; i < pnBytes.length ; i++) {
+            nonce[offset + i] ^= pnBytes[i];
+        }
+        return new GCMParameterSpec(GCM_BITS, nonce);
     }
 
-    public EndpointFunctions getServer() {
-        return serverKeys;
+    SecretKey getWPayloadKey() {
+        return wPayload;
     }
 
-    //TODO: abstract these methods out
-    class EndpointFunctions extends CryptoContext.EndpointFunctions {
-        final SecretKey key;
-        final SecretKey hpKey;
-        final IvParameterSpec iv;
-        final Cipher payloadCipher;
-        final Cipher headerCipher;
+    Cipher getWPayloadCipher() {
+        return wPayloadCipher;
+    }
 
-        EndpointFunctions(byte[] secret) throws GeneralSecurityException {
-            iv = new IvParameterSpec(hkdf.expand(secret, IV_LABEL, IV_LENGTH));
-            key = new SecretKeySpec(hkdf.expand(secret, KEY_LABEL, KEY_LENGTH), "AES");
-            hpKey = new SecretKeySpec(hkdf.expand(secret, HP_LABEL, KEY_LENGTH), "AES");
-            payloadCipher = Cipher.getInstance("AES/GCM/NoPadding");
-            headerCipher = Cipher.getInstance("AES/ECB/NoPadding");
-            headerCipher.init(Cipher.ENCRYPT_MODE, hpKey);
-        }
+    Cipher getWHeaderCipher() {
+        return wHeaderCipher;
+    }
 
-        AlgorithmParameterSpec createIV(int packetNum) {
-            final byte[] nonce = iv.getIV();
-            final byte[] pnBytes = BigInteger.valueOf(packetNum).toByteArray();
-            final int offset = nonce.length - pnBytes.length;
-            for (int i = 0 ; i < pnBytes.length ; i++) {
-                nonce[offset + i] ^= pnBytes[i];
-            }
-            return new GCMParameterSpec(GCM_BITS, nonce);
-        }
+    protected static IvParameterSpec expandIV(SecretKey key, Label label) {
+        return new IvParameterSpec(hkdf.expand(key, label.bytes, label.length));
+    }
 
-        SecretKey getKey() {
-            return key;
-        }
-
-        Cipher getPayloadCipher() {
-            return payloadCipher;
-        }
-
-        Cipher getHeaderCipher() {
-            return headerCipher;
-        }
+    protected static SecretKey expandKey(SecretKey key, Label label) {
+        return new SecretKeySpec(hkdf.expand(key, label.bytes, label.length), "AES");
     }
 }
