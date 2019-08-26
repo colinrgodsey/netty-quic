@@ -10,7 +10,7 @@ import com.colingodsey.quic.packet.components.ConnectionID;
 import com.colingodsey.quic.packet.components.Header;
 import com.colingodsey.quic.packet.components.LongHeader;
 import com.colingodsey.quic.packet.components.LongHeader.Type;
-import com.colingodsey.quic.packet.frames.Frame;
+import com.colingodsey.quic.packet.frame.Frame;
 import com.colingodsey.quic.utils.VariableInt;
 
 public class ZeroRTT implements Packet {

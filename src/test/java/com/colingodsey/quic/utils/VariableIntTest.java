@@ -3,39 +3,36 @@ package com.colingodsey.quic.utils;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.Random;
 
 public class VariableIntTest {
-    final List<Entry<Long, ByteBuf>> values = new ArrayList<>();
+    final List<Tuple<Long, ByteBuf>> values = new ArrayList<>();
     final ByteBuf b = Unpooled.buffer();
 
     {
-        values.add(new HashMap.SimpleImmutableEntry<>(151288809941952652L,  b.copy().writeLong( 0xc2197c5eff14e88cL)));
-        values.add(new HashMap.SimpleImmutableEntry<>(494878333L,           b.copy().writeInt(          0x9d7f3e7d)));
-        values.add(new HashMap.SimpleImmutableEntry<>(15293L,               b.copy().writeShort(            0x7bbd)));
-        values.add(new HashMap.SimpleImmutableEntry<>(37L,                  b.copy().writeByte(               0x25)));
+        values.add(new Tuple<>(151288809941952652L,  b.copy().writeLong( 0xc2197c5eff14e88cL)));
+        values.add(new Tuple<>(494878333L,           b.copy().writeInt(          0x9d7f3e7d)));
+        values.add(new Tuple<>(15293L,               b.copy().writeShort(            0x7bbd)));
+        values.add(new Tuple<>(37L,                  b.copy().writeByte(               0x25)));
     }
 
     @Test
     public void decode() {
-        values.forEach(pair -> assertEquals((long) pair.getKey(),
-                VariableInt.read(pair.getValue().duplicate())));
+        values.forEach(pair -> assertEquals((long) pair.getA(),
+                VariableInt.read(pair.getB().duplicate())));
         assertEquals(37L, VariableInt.read(b.copy().writeShort(0x4025)));
     }
 
     @Test
     public void encode() {
         values.forEach(pair -> {
-            assertEquals(makeList(pair.getValue()), makeList(VariableInt.write(pair.getKey(), b.copy())));
+            assertEquals(makeList(pair.getB()), makeList(VariableInt.write(pair.getA(), b.copy())));
         });
     }
 

@@ -6,11 +6,11 @@ import io.netty.handler.codec.MessageToMessageCodec;
 import java.util.List;
 
 import com.colingodsey.quic.QUIC;
-import com.colingodsey.quic.packet.frames.Crypto;
-import com.colingodsey.quic.pipeline.components.FrameOrderer;
+import com.colingodsey.quic.packet.frame.Crypto;
+import com.colingodsey.quic.pipeline.components.FrameOrdering;
 
 public class CryptoOrdering extends MessageToMessageCodec<Crypto, Crypto> {
-    protected FrameOrderer<Crypto> inQueue = new FrameOrderer<>();
+    protected FrameOrdering<Crypto> inQueue = new FrameOrdering<>();
     protected long outOffset = 0;
 
     @Override

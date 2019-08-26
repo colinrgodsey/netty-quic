@@ -3,15 +3,11 @@ package com.colingodsey.quic.crypto.pipeline;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
-import io.netty.channel.EventLoopGroup;
 import io.netty.channel.embedded.QUICTestChannel;
-import io.netty.channel.nio.NioEventLoopGroup;
-
-import java.net.InetSocketAddress;
 
 import com.colingodsey.quic.QUIC;
 import com.colingodsey.quic.packet.components.LongHeader.Type;
-import com.colingodsey.quic.packet.frames.Crypto;
+import com.colingodsey.quic.packet.frame.Crypto;
 import com.colingodsey.quic.utils.TestFrameCodec;
 import com.colingodsey.quic.utils.TestSSLContext;
 

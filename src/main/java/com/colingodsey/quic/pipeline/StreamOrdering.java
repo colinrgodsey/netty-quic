@@ -6,11 +6,11 @@ import io.netty.handler.codec.MessageToMessageCodec;
 import java.util.List;
 
 import com.colingodsey.quic.QUIC;
-import com.colingodsey.quic.packet.frames.Stream;
-import com.colingodsey.quic.pipeline.components.FrameOrderer;
+import com.colingodsey.quic.packet.frame.Stream;
+import com.colingodsey.quic.pipeline.components.FrameOrdering;
 
 public class StreamOrdering extends MessageToMessageCodec<Stream, Stream> {
-    protected FrameOrderer<Stream> inQueue = new FrameOrderer<>();
+    protected FrameOrdering<Stream> inQueue = new FrameOrdering<>();
     protected long outOffset = 0;
 
     @Override

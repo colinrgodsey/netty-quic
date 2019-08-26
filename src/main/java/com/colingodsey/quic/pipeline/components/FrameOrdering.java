@@ -2,16 +2,14 @@ package com.colingodsey.quic.pipeline.components;
 
 import io.netty.util.ReferenceCountUtil;
 
-import java.util.Comparator;
 import java.util.function.Consumer;
 
-import com.colingodsey.quic.packet.frames.Frame;
-import com.colingodsey.quic.packet.frames.Frame.Splittable;
+import com.colingodsey.quic.packet.frame.Frame;
 
 import it.unimi.dsi.fastutil.objects.ObjectRBTreeSet;
 
-public class FrameOrderer<T extends Frame.Splittable> {
-    protected ObjectRBTreeSet<T> queue = new ObjectRBTreeSet<>(SplittableComparator.INSTANCE);
+public class FrameOrdering<T extends Frame.Orderable> {
+    protected ObjectRBTreeSet<T> queue = new ObjectRBTreeSet<>(Frame.Orderable.Comparator.INSTANCE);
     protected long offset = 0;
 
     public void process(T msg, Consumer<T> out) {
@@ -39,15 +37,5 @@ public class FrameOrderer<T extends Frame.Splittable> {
     public void clear() {
         queue.forEach(ReferenceCountUtil::safeRelease);
         queue.clear();
-    }
-
-    protected static class SplittableComparator implements Comparator<Splittable> {
-        public static final Comparator<Splittable> INSTANCE = new SplittableComparator();
-
-        SplittableComparator() {}
-
-        public int compare(Splittable a, Splittable b) {
-            return Long.compare(a.getOffset(), b.getOffset());
-        }
     }
 }

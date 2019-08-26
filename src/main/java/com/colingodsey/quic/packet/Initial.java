@@ -13,8 +13,8 @@ import com.colingodsey.quic.crypto.context.CryptoContext;
 import com.colingodsey.quic.packet.components.ConnectionID;
 import com.colingodsey.quic.packet.components.LongHeader;
 import com.colingodsey.quic.packet.components.LongHeader.Type;
-import com.colingodsey.quic.packet.frames.Frame;
-import com.colingodsey.quic.packet.frames.Padding;
+import com.colingodsey.quic.packet.frame.Frame;
+import com.colingodsey.quic.packet.frame.Padding;
 import com.colingodsey.quic.utils.Utils;
 import com.colingodsey.quic.utils.VariableInt;
 

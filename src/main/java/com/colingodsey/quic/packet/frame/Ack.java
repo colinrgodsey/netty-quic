@@ -1,4 +1,4 @@
-package com.colingodsey.quic.packet.frames;
+package com.colingodsey.quic.packet.frame;
 
 import io.netty.buffer.ByteBuf;
 

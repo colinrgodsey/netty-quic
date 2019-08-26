@@ -1,17 +1,17 @@
-package com.colingodsey.quic.packet.frames;
+package com.colingodsey.quic.packet.frame;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.util.AbstractReferenceCounted;
 import io.netty.util.ReferenceCounted;
 
 import java.util.function.Consumer;
 
 import com.colingodsey.quic.packet.components.LongHeader;
+import com.colingodsey.quic.packet.frame.Frame.Orderable;
 import com.colingodsey.quic.utils.VariableInt;
 
 public final class Crypto extends AbstractReferenceCounted implements Frame,
-        Frame.Initial, Frame.Handshake, Frame.Splittable {
+        Frame.Initial, Frame.Handshake, Orderable {
     public static final int PACKET_ID = 0x06;
 
     private final long offset;

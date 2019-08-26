@@ -1,12 +1,13 @@
-package com.colingodsey.quic.packet.frames;
+package com.colingodsey.quic.packet.frame;
 
 import io.netty.buffer.ByteBuf;
 
 import java.util.function.Consumer;
 
+import com.colingodsey.quic.packet.frame.Frame.Orderable;
 import com.colingodsey.quic.utils.VariableInt;
 
-public class Stream implements Frame, Frame.Splittable {
+public class Stream implements Frame, Orderable {
     public final boolean isFin;
     public final long streamID, offset;
     public final int length;

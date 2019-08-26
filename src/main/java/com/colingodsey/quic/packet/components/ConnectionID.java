@@ -40,7 +40,7 @@ public final class ConnectionID {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        ConnectionID id = (ConnectionID) o;
+        final ConnectionID id = (ConnectionID) o;
         return hashCode() == id.hashCode() && Arrays.equals(bytes, id.bytes);
     }
 

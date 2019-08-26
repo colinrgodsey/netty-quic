@@ -1,4 +1,4 @@
-package com.colingodsey.quic.packet.frames;
+package com.colingodsey.quic.packet.frame;
 
 import io.netty.buffer.ByteBuf;
 
@@ -72,9 +72,20 @@ public interface Frame {
     interface Initial extends Frame {}
     interface Handshake extends Frame {}
 
-    interface Splittable extends Frame {
+    interface Orderable extends Frame {
         long getOffset();
         int getPayloadLength();
         long splitAndOrder(long offset, int maxLength, Consumer<Crypto> out);
+
+        class Comparator implements java.util.Comparator<Orderable> {
+            public static final java.util.Comparator<Frame.Orderable> INSTANCE =
+                    new Comparator();
+
+            Comparator() {}
+
+            public int compare(Frame.Orderable a, Frame.Orderable b) {
+                return Long.compare(a.getOffset(), b.getOffset());
+            }
+        }
     }
 }

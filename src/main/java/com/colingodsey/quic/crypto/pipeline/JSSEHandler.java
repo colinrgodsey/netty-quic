@@ -1,11 +1,8 @@
 package com.colingodsey.quic.crypto.pipeline;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.util.ReferenceCountUtil;
 
 import java.nio.ByteBuffer;
 import java.security.GeneralSecurityException;
@@ -16,9 +13,8 @@ import com.colingodsey.quic.QUIC;
 import com.colingodsey.quic.crypto.context.CryptoContext;
 import com.colingodsey.quic.packet.components.LongHeader;
 import com.colingodsey.quic.packet.components.LongHeader.Type;
-import com.colingodsey.quic.packet.frames.Crypto;
-import com.colingodsey.quic.utils.Utils;
-import javax.crypto.SecretKey;
+import com.colingodsey.quic.packet.frame.Crypto;
+
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;

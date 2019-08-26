@@ -1,4 +1,4 @@
-package com.colingodsey.quic.packet.frames;
+package com.colingodsey.quic.packet.frame;
 
 import it.unimi.dsi.fastutil.longs.LongComparators;
 import it.unimi.dsi.fastutil.longs.LongRBTreeSet;
