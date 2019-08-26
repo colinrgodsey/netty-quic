@@ -7,9 +7,10 @@ import java.util.function.Consumer;
 import com.colingodsey.quic.packet.frame.Frame;
 
 import it.unimi.dsi.fastutil.objects.ObjectRBTreeSet;
+import it.unimi.dsi.fastutil.objects.ObjectSortedSet;
 
 public class FrameOrdering<T extends Frame.Orderable> {
-    protected ObjectRBTreeSet<T> queue = new ObjectRBTreeSet<>(Frame.Orderable.Comparator.INSTANCE);
+    protected ObjectSortedSet<T> queue = new ObjectRBTreeSet<>(Frame.Orderable.Comparator.INSTANCE);
     protected long offset = 0;
 
     public void process(T msg, Consumer<T> out) {

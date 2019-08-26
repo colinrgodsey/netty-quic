@@ -77,7 +77,7 @@ public interface Frame {
         int getPayloadLength();
         long splitAndOrder(long offset, int maxLength, Consumer<Crypto> out);
 
-        class Comparator implements java.util.Comparator<Orderable> {
+        class Comparator implements java.util.Comparator<Frame.Orderable> {
             public static final java.util.Comparator<Frame.Orderable> INSTANCE = new Comparator();
 
             private Comparator() {}
