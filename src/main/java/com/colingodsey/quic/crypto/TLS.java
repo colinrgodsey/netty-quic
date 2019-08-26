@@ -24,8 +24,7 @@ public class TLS {
         // NOOP
     }
 
-    public TLS() {
+    private TLS() {
+        // NOOP
     }
-
-
 }

@@ -1,8 +1,10 @@
 package com.colingodsey.quic.crypto.pipeline;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.util.ReferenceCountUtil;
 
 import java.nio.ByteBuffer;
@@ -21,21 +23,21 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLEngineResult.HandshakeStatus;
+import javax.net.ssl.SSLEngineResult.Status;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLSession;
 
-public class JSSEHandler extends ChannelInboundHandlerAdapter {
+public class JSSEHandler extends SimpleChannelInboundHandler<Crypto> {
     static final ByteBuffer EMPTY_BYTEBUFFER = ByteBuffer.wrap(new byte[0]);
 
     final boolean isServer;
     final SSLEngine engine;
 
-    ByteBuf inBuffer;
-    ByteBuf outBuffer;
+    ByteBuf inBuffer, outBuffer;
     boolean dirty = false;
     boolean helloReceived = false;
-    int initialOffset = 0;
-    int handshakeOffset = 0;
+    boolean helloSent = false;
+    boolean awaitingInput = true;
 
     public JSSEHandler(boolean isServer, SSLContext context) {
         this.isServer = isServer;
@@ -47,11 +49,11 @@ public class JSSEHandler extends ChannelInboundHandlerAdapter {
     }
 
     @Override
-    public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+    public void handlerAdded(ChannelHandlerContext ctx) {
         inBuffer = newHandshakeBuffer(ctx);
         outBuffer = newHandshakeBuffer(ctx);
         ctx.channel().eventLoop().execute(() -> {
-            ctx.fireChannelActive();
+            //ctx.fireChannelActive();
             if (!isServer) {
                 processHandshake(ctx);
                 maybeFlush(ctx);
@@ -60,34 +62,26 @@ public class JSSEHandler extends ChannelInboundHandlerAdapter {
     }
 
     @Override
-    public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+    public void handlerRemoved(ChannelHandlerContext ctx) {
         if (inBuffer != null) {
             inBuffer.release();
         }
         if (outBuffer != null) {
             outBuffer.release();
         }
-        inBuffer = outBuffer = null;
+        inBuffer = null;
+        outBuffer = null;
     }
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        if (msg instanceof ByteBuf) {
-            try {
-                inBuffer.writeBytes((ByteBuf) msg);
-            } finally {
-                ReferenceCountUtil.release(msg);
-            }
-        } else {
-            ctx.fireChannelRead(msg);
-        }
-    }
-
-    @Override
-    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
+    public void channelReadComplete(ChannelHandlerContext ctx) {
         processHandshake(ctx);
         ctx.fireChannelReadComplete();
         maybeFlush(ctx);
+    }
+
+    protected void channelRead0(ChannelHandlerContext ctx, Crypto msg) {
+        msg.writePayload(inBuffer);
     }
 
     protected ByteBuf newHandshakeBuffer(ChannelHandlerContext ctx) {
@@ -95,20 +89,16 @@ public class JSSEHandler extends ChannelInboundHandlerAdapter {
     }
 
     protected void produceTLSMessage(ChannelHandlerContext ctx) {
-        final byte[] payload = new byte[outBuffer.readableBytes()];
-        ctx.write(outBuffer.copy());
-        //outBuffer.readBytes(payload);
+        final ByteBuf payload = outBuffer.copy();
         outBuffer.clear();
 
-        /*if (!helloReceived) {
-            ctx.write(new Crypto(payload, initialOffset, Type.INITIAL));
-            initialOffset += payload.length;
-        } else {
-            ctx.write(new Crypto(payload, handshakeOffset, Type.HANDSHAKE));
-            handshakeOffset += payload.length;
-        }*/
-
+        ctx.write(new Crypto(getEncryptionLevel(), payload));
         dirty = true;
+    }
+
+    protected LongHeader.Type getEncryptionLevel() {
+        final boolean helloDone = (isServer && helloSent) || (!isServer && helloReceived);
+        return helloDone ? Type.HANDSHAKE : Type.INITIAL;
     }
 
     protected void processHandshake0(ChannelHandlerContext ctx) {
@@ -117,12 +107,14 @@ public class JSSEHandler extends ChannelInboundHandlerAdapter {
             final SSLEngineResult writeRes = engine.wrap(EMPTY_BYTEBUFFER,
                     outBuffer.nioBuffer(outBuffer.writerIndex(), outBuffer.writableBytes()));
 
-            if (inBuffer.isReadable()) {
+            awaitingInput = readRes.getStatus() == Status.BUFFER_UNDERFLOW;
+
+            if (inBuffer.isReadable() && !awaitingInput) {
                 helloReceived = true;
             }
 
             outBuffer.writerIndex(outBuffer.writerIndex() + writeRes.bytesProduced());
-            inBuffer.readerIndex(inBuffer.readerIndex() + readRes.bytesConsumed());
+            inBuffer.skipBytes(readRes.bytesConsumed());
 
             if (!inBuffer.isReadable()) {
                 inBuffer.clear();
@@ -130,6 +122,7 @@ public class JSSEHandler extends ChannelInboundHandlerAdapter {
 
             if (outBuffer.isReadable()) {
                 produceTLSMessage(ctx);
+                helloSent = true;
             }
 
             checkKeys(ctx);
@@ -156,12 +149,14 @@ public class JSSEHandler extends ChannelInboundHandlerAdapter {
                     config.setHandshakeContext(
                             CryptoContext.createKeyed(session.getCipherSuite(),
                                     openEngine.getHandshakeWriteSecret(), openEngine.getHandshakeReadSecret()));
+                    onHandshakeKey(ctx);
                 }
 
                 if (config.getMasterContext() == null && openEngine.getMasterReadSecret() != null) {
                     config.setMasterContext(
                             CryptoContext.createKeyed(session.getCipherSuite(),
                                     openEngine.getMasterWriteSecret(), openEngine.getMasterReadSecret()));
+                    onMasterKey(ctx);
                 }
             }
         } catch (GeneralSecurityException e) {
@@ -182,7 +177,7 @@ public class JSSEHandler extends ChannelInboundHandlerAdapter {
     }
 
     protected boolean shouldUnwrap() {
-        return engine.getHandshakeStatus() == HandshakeStatus.NEED_UNWRAP && inBuffer.isReadable();
+        return engine.getHandshakeStatus() == HandshakeStatus.NEED_UNWRAP && inBuffer.isReadable() && !awaitingInput;
     }
 
     protected void maybeFlush(ChannelHandlerContext ctx) {
@@ -207,8 +202,8 @@ public class JSSEHandler extends ChannelInboundHandlerAdapter {
                 taskList.add(runnable);
             }
             taskList.add(() -> processHandshake(ctx));
-            taskList.add(() -> maybeFlush(ctx));
             taskList.add(() -> checkKeys(ctx));
+            taskList.add(() -> maybeFlush(ctx));
             ctx.channel().eventLoop().execute(() -> taskList.forEach(Runnable::run));
         }
     }

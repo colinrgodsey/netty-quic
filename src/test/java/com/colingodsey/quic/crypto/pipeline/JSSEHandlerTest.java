@@ -2,101 +2,99 @@ package com.colingodsey.quic.crypto.pipeline;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNotEquals;
 
-import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.ByteBuf;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelDuplexHandler;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.embedded.QUICTestChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.DatagramPacket;
-import io.netty.channel.socket.nio.NioDatagramChannel;
 
 import java.net.InetSocketAddress;
 
 import com.colingodsey.quic.QUIC;
-import com.colingodsey.quic.channel.DatagramChannelProxy;
+import com.colingodsey.quic.packet.components.LongHeader.Type;
+import com.colingodsey.quic.packet.frames.Crypto;
+import com.colingodsey.quic.utils.TestFrameCodec;
 import com.colingodsey.quic.utils.TestSSLContext;
 
 import org.junit.Test;
 
 public class JSSEHandlerTest {
-    final EventLoopGroup ioGroup = new NioEventLoopGroup();
-    final InetSocketAddress localhost = new InetSocketAddress("localhost", 31745);
+    @Test
+    public void testHandshakeLevels() {
+        QUICTestChannel client = new QUICTestChannel(new JSSEHandler(false, TestSSLContext.sslContext));
+        QUICTestChannel server = new QUICTestChannel(new JSSEHandler(true, TestSSLContext.sslContext));
+
+        runHandshake(client, server);
+
+        assertNotNull(QUIC.config(server).getMasterContext());
+        assertNotNull(QUIC.config(client).getMasterContext());
+        System.gc();
+    }
 
     @Test
-    public void rawHandshake() throws Exception {
-        Channel server = new Bootstrap()
-        .group(ioGroup)
-        .channelFactory(() -> new DatagramChannelProxy(NioDatagramChannel.class))
-        .handler(new ChannelInitializer<Channel>() {
-            protected void initChannel(Channel ch) throws Exception {
-                ch.pipeline()
-                .addLast(new ChannelDuplexHandler() {
-                    InetSocketAddress sender;
+    public void testCryptoOrdering() {
+        QUICTestChannel client = new QUICTestChannel(
+                cfg -> cfg.setFrameSplitSize(30),
+                new TestFrameCodec(),
+                new CryptoOrdering(),
+                new JSSEHandler(false, TestSSLContext.sslContext)
+        );
+        QUICTestChannel server = new QUICTestChannel(
+                cfg -> cfg.setFrameSplitSize(37),
+                new TestFrameCodec(),
+                new CryptoOrdering(),
+                new JSSEHandler(true, TestSSLContext.sslContext)
+        );
 
-                    @Override
-                    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                        if (msg instanceof DatagramPacket) {
-                            sender = ((DatagramPacket) msg).sender();
-                            msg = ((DatagramPacket) msg).content();
-                        }
-                        ctx.fireChannelRead(msg);
-                    }
+        flushAll(client, server);
 
-                    @Override
-                    public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-                        if (msg instanceof ByteBuf) {
-                            msg = new DatagramPacket((ByteBuf) msg, sender);
-                        }
-                        ctx.write(msg, promise);
-                    }
-                })
-                .addLast(new JSSEHandler(true, TestSSLContext.sslContext));
-            }
-        }).bind(localhost).sync().channel();
+        assertNotNull(QUIC.config(server).getMasterContext());
+        assertNotNull(QUIC.config(client).getMasterContext());
+        System.gc();
+    }
 
-        Channel client = new Bootstrap()
-        .group(ioGroup)
-        .channelFactory(() -> new DatagramChannelProxy(NioDatagramChannel.class))
-        .handler(new ChannelInitializer<Channel>() {
-            protected void initChannel(Channel ch) throws Exception {
-                ch.pipeline()
-                .addLast(new ChannelDuplexHandler() {
-                    @Override
-                    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                        if (msg instanceof DatagramPacket) {
-                            msg = ((DatagramPacket) msg).content();
-                        }
-                        ctx.fireChannelRead(msg);
-                    }
-                })
-                .addLast(new JSSEHandler(false, TestSSLContext.sslContext));
-            }
-        }).connect(localhost).sync().channel();
+    void checkForward(QUICTestChannel from, Type type, QUICTestChannel to) {
+        from.runPendingTasks();
+        to.runPendingTasks();
 
-        //normally fired elsewhere
-        //server.pipeline().fireChannelActive();
-        //client.pipeline().fireChannelActive();
+        Crypto msg = from.readOutbound();
+        assertEquals(type, msg.getLevel());
+        to.writeOneInbound(msg);
+        to.flushInbound();
 
-        try {
-            int maxS = 10;
-            while (QUIC.config(client).getMasterContext() == null || QUIC.config(server).getMasterContext() == null) {
-                if (maxS-- <= 0) {
-                    throw new RuntimeException("timeout getting handshake keys");
-                }
-                Thread.sleep(1000);
-            }
+        from.runPendingTasks();
+        to.runPendingTasks();
+    }
 
-            assertNotNull(QUIC.config(client).getHandshakeContext());
-            assertNotNull(QUIC.config(server).getHandshakeContext());
-        } finally {
-            server.close().sync();
-            client.close().sync();
+    void forward(QUICTestChannel from, QUICTestChannel to) {
+        Object msg = from.readOutbound();
+        if (msg != null) {
+            to.writeOneInbound(msg);
+            to.flushInbound();
         }
+
+        from.runPendingTasks();
+        to.runPendingTasks();
+    }
+
+    void flushAll(QUICTestChannel a, QUICTestChannel b) {
+        while (!a.outboundMessages().isEmpty() || !b.outboundMessages().isEmpty()) {
+            forward(a, b);
+            forward(b, a);
+        }
+    }
+
+    void runHandshake(QUICTestChannel client, QUICTestChannel server) {
+        checkForward(client, Type.INITIAL, server); //ClientHello
+        checkForward(server, Type.INITIAL, client); //ServerHello
+
+        assertNotNull(QUIC.config(server).getHandshakeContext());
+        assertNotNull(QUIC.config(client).getHandshakeContext());
+
+        while (!server.outboundMessages().isEmpty()) {
+            checkForward(server, Type.HANDSHAKE, client); //EE, CERT, CV, FIN
+        }
+
+        checkForward(client, Type.HANDSHAKE, server); //Finished
+        checkForward(client, Type.HANDSHAKE, server); //NewSessionTicket
     }
 }

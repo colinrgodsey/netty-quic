@@ -21,6 +21,9 @@ public class QUIC {
 
         CryptoContext getMasterContext();
         void setMasterContext(CryptoContext Context);
+
+        int getFrameSplitSize();
+        void setFrameSplitSize(int size);
     }
 
     public static Config config(ChannelHandlerContext ctx) {

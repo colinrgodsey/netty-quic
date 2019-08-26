@@ -2,6 +2,8 @@ package com.colingodsey.quic.packet.frames;
 
 import io.netty.buffer.ByteBuf;
 
+import java.util.function.Consumer;
+
 import com.colingodsey.quic.packet.components.LongHeader;
 import com.colingodsey.quic.utils.VariableInt;
 
@@ -26,7 +28,7 @@ public interface Frame {
             //case 0x04: // RESET_STREAM
             //case 0x05: // STOP_SENDING
             case Crypto.PACKET_ID: // CRYPTO
-                return new Crypto(in, level);
+                return Crypto.read(in, level);
             case 0x07: // NEW_TOKEN
             case 0x08: // STREAM
             case 0x09:
@@ -69,4 +71,10 @@ public interface Frame {
 
     interface Initial extends Frame {}
     interface Handshake extends Frame {}
+
+    interface Splittable extends Frame {
+        long getOffset();
+        int getPayloadLength();
+        long splitAndOrder(long offset, int maxLength, Consumer<Crypto> out);
+    }
 }
