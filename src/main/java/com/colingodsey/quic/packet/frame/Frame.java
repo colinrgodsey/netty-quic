@@ -52,9 +52,9 @@ public interface Frame {
             case 0x1B: // PATH_RESPONSE
             case 0x1C: // CONNECTION_CLOSE
             case 0x1D:
+            default:
                 throw new RuntimeException("Unknown frame ID " + frameId);
         }
-        return null;
     }
 
     static void verifyPacketId(ByteBuf in, int packetID) {
@@ -78,10 +78,9 @@ public interface Frame {
         long splitAndOrder(long offset, int maxLength, Consumer<Crypto> out);
 
         class Comparator implements java.util.Comparator<Orderable> {
-            public static final java.util.Comparator<Frame.Orderable> INSTANCE =
-                    new Comparator();
+            public static final java.util.Comparator<Frame.Orderable> INSTANCE = new Comparator();
 
-            Comparator() {}
+            private Comparator() {}
 
             public int compare(Frame.Orderable a, Frame.Orderable b) {
                 return Long.compare(a.getOffset(), b.getOffset());

@@ -19,7 +19,7 @@ public class JSSEHandlerTest {
         QUICTestChannel client = new QUICTestChannel(new JSSEHandler(false, TestSSLContext.sslContext));
         QUICTestChannel server = new QUICTestChannel(new JSSEHandler(true, TestSSLContext.sslContext));
 
-        runHandshake(client, server);
+        testHandshake(client, server);
 
         assertNotNull(QUIC.config(server).getMasterContext());
         assertNotNull(QUIC.config(client).getMasterContext());
@@ -29,7 +29,7 @@ public class JSSEHandlerTest {
     @Test
     public void testCryptoOrdering() {
         QUICTestChannel client = new QUICTestChannel(
-                cfg -> cfg.setFrameSplitSize(30),
+                cfg -> cfg.setFrameSplitSize(31),
                 new TestFrameCodec(),
                 new CryptoOrdering(),
                 new JSSEHandler(false, TestSSLContext.sslContext)
@@ -41,7 +41,7 @@ public class JSSEHandlerTest {
                 new JSSEHandler(true, TestSSLContext.sslContext)
         );
 
-        flushAll(client, server);
+        flushUntilEmpty(client, server);
 
         assertNotNull(QUIC.config(server).getMasterContext());
         assertNotNull(QUIC.config(client).getMasterContext());
@@ -72,14 +72,14 @@ public class JSSEHandlerTest {
         to.runPendingTasks();
     }
 
-    void flushAll(QUICTestChannel a, QUICTestChannel b) {
+    void flushUntilEmpty(QUICTestChannel a, QUICTestChannel b) {
         while (!a.outboundMessages().isEmpty() || !b.outboundMessages().isEmpty()) {
             forward(a, b);
             forward(b, a);
         }
     }
 
-    void runHandshake(QUICTestChannel client, QUICTestChannel server) {
+    void testHandshake(QUICTestChannel client, QUICTestChannel server) {
         checkForward(client, Type.INITIAL, server); //ClientHello
         checkForward(server, Type.INITIAL, client); //ServerHello
 
