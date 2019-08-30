@@ -131,9 +131,9 @@ public class CryptoContextTest {
         assertArrayEquals(
                 h2ba("8681359410a70bb9c92f0420"),
                 secrets.wIV.getIV());
-        assertArrayEquals(
+        /*assertArrayEquals(
                 h2ba("a980b8b4fb7d9fbc13e814c23164253d"),
-                secrets.wHP.getEncoded());
+                secrets.wHP.getEncoded());*/
 
         /*assertArrayEquals(
                 h2ba("5d51da9ee897a21b2659ccc7e5bfa577"),
@@ -141,9 +141,9 @@ public class CryptoContextTest {
         assertArrayEquals(
                 h2ba("5e5ae651fd1e8495af13508b"),
                 secrets.rIV.getIV());
-        assertArrayEquals(
+        /*assertArrayEquals(
                 h2ba("a8ed82e6664f865aedf6106943f95fb8"),
-                secrets.rHP.getEncoded());
+                secrets.rHP.getEncoded());*/
     }
 
     @Test
@@ -159,10 +159,14 @@ public class CryptoContextTest {
         aadBuf.writeShort(0x4000 | (pnLength + testPayload.length + 16));
         Packet.writeFixedLengthInt(packetNumber, pnLength, aadBuf);*/
 
-        final byte[] ePayload = Utils.createBytes(out -> ctx.encryptPayload(
-                Unpooled.wrappedBuffer(testHeader),
-                Unpooled.buffer().writeBytes(testPayload).writeBytes(new byte[800]),
-                packetNumber, out), 1200);
+        final byte[] ePayload = Utils.createBytes(out -> {
+            int written = ctx.payloadCrypto(
+                    Unpooled.wrappedBuffer(testHeader).nioBuffer(),
+                    Unpooled.buffer().writeBytes(testPayload).writeBytes(new byte[800]).nioBuffer(),
+                    packetNumber,
+                    out.nioBuffer(0, 1200), true);
+            out.writerIndex(out.writerIndex() + written);
+        }, 1200);
 
         //payload needs to be 1163 before encrypting
         /*Assert.assertArrayEquals(
@@ -224,18 +228,42 @@ public class CryptoContextTest {
         final ByteBuf out = Unpooled.buffer();
         final Packet testPacket = new Packet(
                 Header.read(Unpooled.wrappedBuffer(testHeader)),
-                //new InitialHeader(0xff000017, connID, ConnectionID.EMPTY,  new byte[0], testPayloadPadded.length, 2),
                 Unpooled.wrappedBuffer(testPayloadPadded)
         );
 
         clientCtx.encrypt(testPacket, out);
-        final Packet testPacketOut = serverCtx.decrypt(out);
+
+        assertArrayEquals(
+                testEncryptedPacket,
+                Utils.createBytes(buf ->
+                        buf.writeBytes(out.duplicate()), 100)
+        );
+
+        final Packet testPacketOut = serverCtx.decrypt(out.slice());
 
         assertArrayEquals(
                 testPayloadPadded,
                 Utils.createBytes(buf ->
                         buf.writeBytes(testPacketOut.getPayload().duplicate()), 100)
         );
+    }
+
+    @Test
+    public void contextStateTest() throws Exception {
+        final TLS_AES_128_GCM_SHA256 clientCtx = new TLS_AES_128_GCM_SHA256(connID, false);
+        final TLS_AES_128_GCM_SHA256 serverCtx = new TLS_AES_128_GCM_SHA256(connID, true);
+
+        for (int i = 0 ; i < 10 ; i++) {
+            final ByteBuf out = Unpooled.buffer();
+            final Packet testPacket = new Packet(
+                    new InitialHeader(0xff000017, connID, ConnectionID.EMPTY,
+                            new byte[0], testPayloadPadded.length, i),
+                    Unpooled.wrappedBuffer(testPayloadPadded)
+            );
+
+            clientCtx.encrypt(testPacket, out);
+            serverCtx.decrypt(out.slice());
+        }
     }
 
     @Test

@@ -130,7 +130,6 @@ public class JSSEHandler extends SimpleChannelInboundHandler<Crypto> {
         final QUIC.Config config = QUIC.config(ctx);
 
         SSLSession session = engine.getHandshakeSession();
-
         if (session == null) {
             session = engine.getSession();
         }

@@ -3,8 +3,10 @@ package com.colingodsey.quic.crypto.context;
 import static com.colingodsey.quic.utils.Utils.h2ba;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
+import io.netty.util.ReferenceCountUtil;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -72,41 +74,29 @@ public abstract class CryptoContext {
     abstract SecretKey getRPayloadKey();
     abstract Cipher getRHeaderCipher();
 
-    public void encryptPayload(ByteBuf header, ByteBuf payload, int packetNumber, ByteBuf out) {
+    public int payloadCrypto(ByteBuffer header, ByteBuffer payload, int packetNumber, ByteBuffer out, boolean isEncrypt) {
         final Cipher cipher = getPayloadCipher();
         try {
-            cipher.init(Cipher.ENCRYPT_MODE, getWPayloadKey(), createIV(packetNumber, true));
-            cipher.updateAAD(header.nioBuffer());
-            out.ensureWritable(cipher.getOutputSize(payload.readableBytes()));
-            final int length = cipher.doFinal(payload.nioBuffer(),
-                    out.nioBuffer(out.writerIndex(), out.writableBytes()));
-            out.writerIndex(out.writerIndex() + length);
+            cipher.init(
+                    isEncrypt ? Cipher.ENCRYPT_MODE : Cipher.DECRYPT_MODE,
+                    isEncrypt ? getWPayloadKey() : getRPayloadKey(),
+                    createIV(packetNumber, isEncrypt)
+            );
+            cipher.updateAAD(header);
+            return cipher.doFinal(payload, out);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
-    public void decryptPayload(ByteBuf header, ByteBuf payload, int packetNumber, ByteBuf out) {
-        final Cipher cipher = getPayloadCipher();
-        try {
-            cipher.init(Cipher.DECRYPT_MODE, getRPayloadKey(), createIV(packetNumber, false));
-            cipher.updateAAD(header.nioBuffer());
-            out.ensureWritable(cipher.getOutputSize(payload.readableBytes()));
-            final int length = cipher.doFinal(payload.nioBuffer(),
-                    out.nioBuffer(out.writerIndex(), out.writableBytes()));
-            out.writerIndex(out.writerIndex() + length);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public byte[] headerProtectMask(ByteBuf encryptedPayload, int pnLength, boolean isEncrypt) {
+    public byte[] headerProtectMask(ByteBuf ePayload, int index, int pnLength, boolean isEncrypt) {
         final Cipher cipher = isEncrypt ? getWHeaderCipher() : getRHeaderCipher();
         final byte[] out = new byte[cipher.getOutputSize(SAMPLE_SIZE)];
-        final ByteBuf sample = encryptedPayload.slice(
-                encryptedPayload.readerIndex() + 4 - pnLength, SAMPLE_SIZE);
         try {
-            cipher.doFinal(sample.nioBuffer(), ByteBuffer.wrap(out));
+            cipher.doFinal(
+                    ePayload.nioBuffer(index + 4 - pnLength, SAMPLE_SIZE),
+                    ByteBuffer.wrap(out)
+            );
             return out;
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -114,56 +104,72 @@ public abstract class CryptoContext {
     }
 
     public byte[] headerProtectMask(byte[] encryptedPayload, int pnLength, boolean isEncrypt) {
-        return headerProtectMask(Unpooled.wrappedBuffer(encryptedPayload), pnLength, isEncrypt);
+        return headerProtectMask(Unpooled.wrappedBuffer(encryptedPayload), 0, pnLength, isEncrypt);
     }
 
     protected void encrypt(Packet packet, ByteBuf out) {
-        final int readerIndex = out.readerIndex();
+        final int head = out.writerIndex();
         final Header header = packet.getHeader();
         header.write(out);
-        final boolean isShort = header instanceof ShortHeader;
-        final int headerOffset = out.writerIndex();
-        final int pnOffset = headerOffset - header.getPacketNumberBytes();
 
-        encryptPayload(out, packet.getPayload(), header.getPacketNumber(), out);
-        final byte[] mask = headerProtectMask(out.readerIndex(headerOffset),
+        final int headerLength = out.readableBytes();
+        final boolean isShort = header instanceof ShortHeader;
+        final int pnIndex = head + headerLength - header.getPacketNumberBytes();
+
+        out.ensureWritable(packet.getPayload().readableBytes() + 16);
+
+        final int written = payloadCrypto(
+                out.nioBuffer(head, headerLength),
+                packet.getPayload().nioBuffer(),
+                header.getPacketNumber(),
+                out.nioBuffer(out.writerIndex(), out.writableBytes()), true);
+        out.writerIndex(out.writerIndex() + written);
+
+        final byte[] mask = headerProtectMask(
+                out, head + headerLength,
                 header.getPacketNumberBytes(), true);
-        out.readerIndex(readerIndex);
+
         xor(out, 0, mask[0] & (isShort ? 0x1F : 0xF));
         for (int i = 0 ; i < header.getPacketNumberBytes() ; i++) {
-            xor(out, pnOffset + i, mask[1 + i]);
+            xor(out, pnIndex + i, mask[1 + i]);
         }
     }
 
+    //decrypt in place
     protected Packet decrypt(ByteBuf in) {
-        final int readerIndex = in.readerIndex();
+        final int head = in.readerIndex();
         final boolean isShort = Header.getType(in) == null;
         final int preHeaderLength = Header.getHeaderLength(in, false) + 4;
         final byte[] mask = headerProtectMask(
-                in.readerIndex(readerIndex + preHeaderLength), 4, false);
+                in, head + preHeaderLength, 4, false);
 
-        xor(in.readerIndex(readerIndex), 0, mask[0] & (isShort ? 0x1F : 0xF));
+        //unmask first byte so we can get the real packetNumberBytes
+        xor(in, head, mask[0] & (isShort ? 0x1F : 0xF));
 
         final int headerLength = Header.getHeaderLength(in, true);
         final int pnLength = Header.getPacketNumberBytes(in);
-        final int pnOffset = headerLength - pnLength;
+        final int pnIndex = head + headerLength - pnLength;
 
         for (int i = 0 ; i < pnLength ; i++) {
-            xor(in, pnOffset + i, mask[1 + i]);
+            xor(in, pnIndex + i, mask[1 + i]);
         }
 
-        final Header header = Header.read(in.readerIndex(readerIndex));
-        final ByteBuf payload = in.alloc().ioBuffer(in.readableBytes() + 100);
-        decryptPayload(
-                in.slice(readerIndex, in.readerIndex()),
-                in, header.getPacketNumber(), payload);
+        final Header header = Header.read(in.readerIndex(head));
+        final int ePayloadLength = in.readableBytes();
+        assert (in.readerIndex() - head) == headerLength;
 
-        return new Packet(header, payload);
+        final int written = payloadCrypto(
+                in.nioBuffer(head, headerLength),
+                in.nioBuffer(head + headerLength, ePayloadLength),
+                header.getPacketNumber(),
+                in.nioBuffer(head, ePayloadLength), false);
+        in.skipBytes(ePayloadLength);
+
+        return new Packet(header, in.slice(head, written));
     }
 
-    static final void xor(ByteBuf buf, int offset, int value) {
-        final int x = buf.getUnsignedByte(buf.readerIndex() + offset);
-        buf.setByte(buf.readerIndex() + offset, x ^ (value & 0xFF));
+    static final void xor(ByteBuf buf, int index, int value) {
+        buf.setByte(index, buf.getUnsignedByte(index) ^ (value & 0xFF));
     }
 
     static class Label {

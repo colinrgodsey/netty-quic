@@ -19,14 +19,12 @@ public class TLS_AES_128_GCM_SHA256 extends CryptoContext {
     static final HKDF hkdf = HKDF.fromHmacSha256();
 
     final SecretKey wPayload;
-    final SecretKey wHP;
     final IvParameterSpec wIV;
     final Cipher payloadCipher;
     final Cipher wHeaderCipher;
     final Cipher rHeaderCipher;
 
     final SecretKey rPayload;
-    final SecretKey rHP;
     final IvParameterSpec rIV;
 
     TLS_AES_128_GCM_SHA256(ConnectionID connectionID, boolean isServer) throws GeneralSecurityException {
@@ -45,16 +43,14 @@ public class TLS_AES_128_GCM_SHA256 extends CryptoContext {
         payloadCipher = Cipher.getInstance("AES/GCM/NoPadding");
 
         wPayload = expandKey(encryptKey, QUIC_KEY_LABEL);
-        wHP = expandKey(encryptKey, QUIC_HP_LABEL);
         wIV = expandIV(encryptKey, QUIC_IV_LABEL);
         wHeaderCipher = Cipher.getInstance("AES/ECB/NoPadding");
-        wHeaderCipher.init(Cipher.ENCRYPT_MODE, wHP);
+        wHeaderCipher.init(Cipher.ENCRYPT_MODE, expandKey(encryptKey, QUIC_HP_LABEL));
 
         rPayload = expandKey(decryptKey, QUIC_KEY_LABEL);
-        rHP = expandKey(decryptKey, QUIC_HP_LABEL);
         rIV = expandIV(decryptKey, QUIC_IV_LABEL);
         rHeaderCipher = Cipher.getInstance("AES/ECB/NoPadding");
-        rHeaderCipher.init(Cipher.ENCRYPT_MODE, rHP);
+        rHeaderCipher.init(Cipher.ENCRYPT_MODE, expandKey(decryptKey, QUIC_HP_LABEL));
     }
 
     AlgorithmParameterSpec createIV(int packetNum, boolean isEncrypt) {
