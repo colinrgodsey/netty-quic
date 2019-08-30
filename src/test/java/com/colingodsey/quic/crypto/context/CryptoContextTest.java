@@ -198,17 +198,20 @@ public class CryptoContextTest {
 
     @Test
     public void testDecrypt() throws Exception {
-        /*final ByteBuf testPacket = Unpooled.wrappedBuffer(testEncryptedPacket);
+        final ByteBuf testPacket = Unpooled.wrappedBuffer(testEncryptedPacket);
         final TLS_AES_128_GCM_SHA256 clientCtx = new TLS_AES_128_GCM_SHA256(connID, false);
         final TLS_AES_128_GCM_SHA256 serverCtx = new TLS_AES_128_GCM_SHA256(connID, true);
 
         final ByteBuf out = Unpooled.buffer();
 
-        //FIX: need to use the right keys here.... thats why these dont match
         Packet packet = serverCtx.decrypt(testPacket);
-        System.out.println(ByteBufUtil.prettyHexDump(packet.getPayload()));
         clientCtx.encrypt(packet, out);
-        System.out.println(ByteBufUtil.prettyHexDump(out));*/
+
+        assertArrayEquals(
+                testPayloadPadded,
+                Utils.createBytes(buf ->
+                        buf.writeBytes(packet.getPayload().duplicate()), 100)
+        );
     }
 
     @Test
@@ -225,7 +228,12 @@ public class CryptoContextTest {
 
         clientCtx.encrypt(testPacket, out);
         final Packet testPacketOut = serverCtx.decrypt(out);
-        System.out.println(ByteBufUtil.prettyHexDump(testPacketOut.getPayload()));
+
+        assertArrayEquals(
+                testPayloadPadded,
+                Utils.createBytes(buf ->
+                        buf.writeBytes(testPacketOut.getPayload().duplicate()), 100)
+        );
     }
 
     @Test
