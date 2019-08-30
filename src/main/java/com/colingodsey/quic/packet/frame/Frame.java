@@ -4,7 +4,7 @@ import io.netty.buffer.ByteBuf;
 
 import java.util.function.Consumer;
 
-import com.colingodsey.quic.packet.components.LongHeader;
+import com.colingodsey.quic.packet.header.LongHeader;
 import com.colingodsey.quic.utils.VariableInt;
 
 public interface Frame {

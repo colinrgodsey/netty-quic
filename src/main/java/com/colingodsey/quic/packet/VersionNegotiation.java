@@ -1,22 +1,12 @@
 package com.colingodsey.quic.packet;
 
-import io.netty.buffer.ByteBuf;
-
-import java.util.ArrayList;
-
-import com.colingodsey.quic.packet.components.ConnectionID;
-import com.colingodsey.quic.packet.components.Header;
-import com.colingodsey.quic.packet.components.LongHeader;
-import com.colingodsey.quic.packet.components.LongHeader.Type;
-import com.colingodsey.quic.utils.QUICRandom;
-
-public class VersionNegotiation implements Packet {
-    public final LongHeader header;
+public class VersionNegotiation {
+    /*public final LongHeader meta;
     public final int[] versions;
 
     public VersionNegotiation(ByteBuf in) {
         final ArrayList<Integer> versionsArr = new ArrayList<>();
-        header = new LongHeader(in);
+        meta = new LongHeader(in);
         while (in.isReadable()) {
             versionsArr.add(in.readInt());
         }
@@ -27,18 +17,18 @@ public class VersionNegotiation implements Packet {
     }
 
     public VersionNegotiation(ConnectionID sourceID, ConnectionID destID, int[] versions) {
-        this.header = new LongHeader(Type.random(), QUICRandom.nextNibble(), 0, sourceID, destID);
+        this.meta = new LongHeader(Type.random(), QUICRandom.nextNibble(), 0, sourceID, destID);
         this.versions = versions;
     }
 
     public void write(ByteBuf out) {
-        header.write(out);
+        meta.write(out);
         for (int version : versions) {
             out.writeInt(version);
         }
     }
 
     public Header getHeader() {
-        return header;
-    }
+        return meta;
+    }*/
 }

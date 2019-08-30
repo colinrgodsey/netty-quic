@@ -1,61 +1,42 @@
 package com.colingodsey.quic.packet;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.util.AbstractReferenceCounted;
+import io.netty.util.ReferenceCountUtil;
+import io.netty.util.ReferenceCounted;
 
-import com.colingodsey.quic.packet.components.Header;
+import com.colingodsey.quic.packet.header.Header;
 
-public interface Packet {
-    Header getHeader();
+public final class Packet extends AbstractReferenceCounted {
+    private final Header header;
+    private final ByteBuf payload;
 
-    static byte[] readBytes(ByteBuf in, int length) {
-        final byte[] out = new byte[length];
-        in.readBytes(out);
-        return out;
+    public Packet(Header header, ByteBuf payload) {
+        //assert header.getPayloadLength() == payload.readableBytes();
+        this.header = header;
+        this.payload = payload;
     }
 
-    static int getFixedLengthIntBytes(int value) {
-        if ((value >>> 8) == 0) {
-            return 1;
-        } else if ((value >>> 16) == 0) {
-            return 2;
-        } else if ((value >>> 24) == 0) {
-            return 3;
-        } else {
-            return 4;
-        }
+    public Header getHeader() {
+        return header;
     }
 
-    static void writeFixedLengthInt(int value, int bytes, ByteBuf out) {
-        switch (bytes) {
-            case 1:
-                out.writeByte(value);
-                break;
-            case 2:
-                out.writeShort(value);
-                break;
-            case 3:
-                out.writeMedium(value);
-                break;
-            case 4:
-                out.writeInt(value);
-                break;
-            default:
-                throw new IllegalArgumentException("Cannot write fixed length int with size: " + bytes);
-        }
+    public ByteBuf getPayload() {
+        return payload;
     }
 
-    static int readFixedLengthInt(ByteBuf in, int bytes) {
-        switch (bytes) {
-            case 1:
-                return in.readUnsignedByte();
-            case 2:
-                return in.readUnsignedShort();
-            case 3:
-                return in.readUnsignedMedium();
-            case 4:
-                return in.readInt();
-            default:
-                throw new IllegalArgumentException("Cannot read fixed length int with size: " + bytes);
-        }
+    /*public int length() {
+        return header.getLength() + payload.readableBytes();
+    }*/
+
+    public ReferenceCounted touch(Object hint) {
+        payload.touch(hint);
+        ReferenceCountUtil.touch(header, hint);
+        return this;
+    }
+
+    protected void deallocate() {
+        payload.release();
+        ReferenceCountUtil.release(header);
     }
 }

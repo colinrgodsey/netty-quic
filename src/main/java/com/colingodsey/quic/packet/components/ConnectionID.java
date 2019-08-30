@@ -3,9 +3,12 @@ package com.colingodsey.quic.packet.components;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 
+import java.math.BigInteger;
 import java.util.Arrays;
 
 public final class ConnectionID {
+    public static final ConnectionID EMPTY = new ConnectionID(new byte[0]);
+
     private final byte[] bytes;
     private volatile int cachedHash = -1;
 
@@ -18,6 +21,14 @@ public final class ConnectionID {
 
     public ConnectionID(byte[] bytes) {
         this.bytes = bytes.clone();
+    }
+
+    public ConnectionID(BigInteger bi) {
+        this.bytes = bi.toByteArray();
+    }
+
+    public ConnectionID(long n) {
+        this(BigInteger.valueOf(n));
     }
 
     public void write(ByteBuf out) {

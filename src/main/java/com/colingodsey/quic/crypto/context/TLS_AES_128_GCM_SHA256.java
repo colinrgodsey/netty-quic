@@ -21,8 +21,9 @@ public class TLS_AES_128_GCM_SHA256 extends CryptoContext {
     final SecretKey wPayload;
     final SecretKey wHP;
     final IvParameterSpec wIV;
-    final Cipher wPayloadCipher;
+    final Cipher payloadCipher;
     final Cipher wHeaderCipher;
+    final Cipher rHeaderCipher;
 
     final SecretKey rPayload;
     final SecretKey rHP;
@@ -40,21 +41,24 @@ public class TLS_AES_128_GCM_SHA256 extends CryptoContext {
         );
     }
 
-    TLS_AES_128_GCM_SHA256(SecretKey writeKey, SecretKey readKey) throws GeneralSecurityException {
-        wPayload = expandKey(writeKey, QUIC_KEY_LABEL);
-        wHP = expandKey(writeKey, QUIC_HP_LABEL);
-        wIV = expandIV(writeKey, QUIC_IV_LABEL);
-        wPayloadCipher = Cipher.getInstance("AES/GCM/NoPadding");
+    TLS_AES_128_GCM_SHA256(SecretKey encryptKey, SecretKey decryptKey) throws GeneralSecurityException {
+        payloadCipher = Cipher.getInstance("AES/GCM/NoPadding");
+
+        wPayload = expandKey(encryptKey, QUIC_KEY_LABEL);
+        wHP = expandKey(encryptKey, QUIC_HP_LABEL);
+        wIV = expandIV(encryptKey, QUIC_IV_LABEL);
         wHeaderCipher = Cipher.getInstance("AES/ECB/NoPadding");
         wHeaderCipher.init(Cipher.ENCRYPT_MODE, wHP);
 
-        rPayload = expandKey(readKey, QUIC_KEY_LABEL);
-        rHP = expandKey(readKey, QUIC_HP_LABEL);
-        rIV = expandIV(readKey, QUIC_IV_LABEL);
+        rPayload = expandKey(decryptKey, QUIC_KEY_LABEL);
+        rHP = expandKey(decryptKey, QUIC_HP_LABEL);
+        rIV = expandIV(decryptKey, QUIC_IV_LABEL);
+        rHeaderCipher = Cipher.getInstance("AES/ECB/NoPadding");
+        rHeaderCipher.init(Cipher.ENCRYPT_MODE, rHP);
     }
 
-    AlgorithmParameterSpec createIV(int packetNum, boolean isWrite) {
-        final byte[] nonce = isWrite ? wIV.getIV() : rIV.getIV();
+    AlgorithmParameterSpec createIV(int packetNum, boolean isEncrypt) {
+        final byte[] nonce = isEncrypt ? wIV.getIV() : rIV.getIV();
         final byte[] pnBytes = BigInteger.valueOf(packetNum).toByteArray();
         final int offset = nonce.length - pnBytes.length;
         for (int i = 0 ; i < pnBytes.length ; i++) {
@@ -63,16 +67,24 @@ public class TLS_AES_128_GCM_SHA256 extends CryptoContext {
         return new GCMParameterSpec(GCM_BITS, nonce);
     }
 
+    Cipher getPayloadCipher() {
+        return payloadCipher;
+    }
+
     SecretKey getWPayloadKey() {
         return wPayload;
     }
 
-    Cipher getWPayloadCipher() {
-        return wPayloadCipher;
-    }
-
     Cipher getWHeaderCipher() {
         return wHeaderCipher;
+    }
+
+    SecretKey getRPayloadKey() {
+        return rPayload;
+    }
+
+    Cipher getRHeaderCipher() {
+        return rHeaderCipher;
     }
 
     protected static IvParameterSpec expandIV(SecretKey key, Label label) {

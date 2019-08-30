@@ -11,9 +11,8 @@ import java.util.List;
 
 import com.colingodsey.quic.QUIC;
 import com.colingodsey.quic.crypto.context.CryptoContext;
-import com.colingodsey.quic.packet.components.LongHeader;
-import com.colingodsey.quic.packet.components.LongHeader.Type;
 import com.colingodsey.quic.packet.frame.Crypto;
+import com.colingodsey.quic.packet.header.LongHeader;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
@@ -94,7 +93,7 @@ public class JSSEHandler extends SimpleChannelInboundHandler<Crypto> {
 
     protected LongHeader.Type getEncryptionLevel() {
         final boolean helloDone = (isServer && helloSent) || (!isServer && helloReceived);
-        return helloDone ? Type.HANDSHAKE : Type.INITIAL;
+        return helloDone ? LongHeader.Type.HANDSHAKE : LongHeader.Type.INITIAL;
     }
 
     protected void processHandshake0(ChannelHandlerContext ctx) {
@@ -140,8 +139,7 @@ public class JSSEHandler extends SimpleChannelInboundHandler<Crypto> {
             if (engine instanceof org.openjsse.javax.net.ssl.SSLEngine && session != null) {
                 final org.openjsse.javax.net.ssl.SSLEngine openEngine = (org.openjsse.javax.net.ssl.SSLEngine) engine;
 
-                if (config.getHandshakeContext() == null && openEngine.getHandshakeReadSecret() != null
-                        && engine.getHandshakeStatus() != HandshakeStatus.NOT_HANDSHAKING) {
+                if (config.getHandshakeContext() == null && openEngine.getHandshakeReadSecret() != null) {
                     config.setHandshakeContext(
                             CryptoContext.createKeyed(session.getCipherSuite(),
                                     openEngine.getHandshakeWriteSecret(), openEngine.getHandshakeReadSecret()));

@@ -6,8 +6,8 @@ import static org.junit.Assert.assertNotNull;
 import io.netty.channel.embedded.QUICTestChannel;
 
 import com.colingodsey.quic.QUIC;
-import com.colingodsey.quic.packet.components.LongHeader.Type;
 import com.colingodsey.quic.packet.frame.Crypto;
+import com.colingodsey.quic.packet.header.LongHeader;
 import com.colingodsey.quic.utils.TestFrameCodec;
 import com.colingodsey.quic.utils.TestSSLContext;
 
@@ -16,39 +16,35 @@ import org.junit.Test;
 public class JSSEHandlerTest {
     @Test
     public void testHandshakeLevels() {
-        QUICTestChannel client = new QUICTestChannel(new JSSEHandler(false, TestSSLContext.sslContext));
-        QUICTestChannel server = new QUICTestChannel(new JSSEHandler(true, TestSSLContext.sslContext));
+        QUICTestChannel client = new QUICTestChannel(
+                new JSSEHandler(false, TestSSLContext.sslContext));
+        QUICTestChannel server = new QUICTestChannel(
+                new JSSEHandler(true, TestSSLContext.sslContext));
 
         testHandshake(client, server);
-
-        assertNotNull(QUIC.config(server).getMasterContext());
-        assertNotNull(QUIC.config(client).getMasterContext());
         System.gc();
     }
 
     @Test
     public void testCryptoOrdering() {
         QUICTestChannel client = new QUICTestChannel(
-                cfg -> cfg.setFrameSplitSize(31),
+                cfg -> cfg.setFrameSplitSize(17),
                 new TestFrameCodec(),
                 new CryptoOrdering(),
                 new JSSEHandler(false, TestSSLContext.sslContext)
         );
         QUICTestChannel server = new QUICTestChannel(
-                cfg -> cfg.setFrameSplitSize(37),
+                cfg -> cfg.setFrameSplitSize(19),
                 new TestFrameCodec(),
                 new CryptoOrdering(),
                 new JSSEHandler(true, TestSSLContext.sslContext)
         );
 
         flushUntilEmpty(client, server);
-
-        assertNotNull(QUIC.config(server).getMasterContext());
-        assertNotNull(QUIC.config(client).getMasterContext());
         System.gc();
     }
 
-    void checkForward(QUICTestChannel from, Type type, QUICTestChannel to) {
+    void checkForward(QUICTestChannel from, LongHeader.Type type, QUICTestChannel to) {
         from.runPendingTasks();
         to.runPendingTasks();
 
@@ -80,17 +76,20 @@ public class JSSEHandlerTest {
     }
 
     void testHandshake(QUICTestChannel client, QUICTestChannel server) {
-        checkForward(client, Type.INITIAL, server); //ClientHello
-        checkForward(server, Type.INITIAL, client); //ServerHello
+        checkForward(client, LongHeader.Type.INITIAL, server); //CH
+        checkForward(server, LongHeader.Type.INITIAL, client); //SH
 
         assertNotNull(QUIC.config(server).getHandshakeContext());
         assertNotNull(QUIC.config(client).getHandshakeContext());
 
         while (!server.outboundMessages().isEmpty()) {
-            checkForward(server, Type.HANDSHAKE, client); //EE, CERT, CV, FIN
+            checkForward(server, LongHeader.Type.HANDSHAKE, client); //EE, CERT, CV, FIN
         }
 
-        checkForward(client, Type.HANDSHAKE, server); //Finished
-        checkForward(client, Type.HANDSHAKE, server); //NewSessionTicket
+        checkForward(client, LongHeader.Type.HANDSHAKE, server); //FIN
+        checkForward(client, LongHeader.Type.HANDSHAKE, server); //NewSessionTicket
+
+        assertNotNull(QUIC.config(server).getMasterContext());
+        assertNotNull(QUIC.config(client).getMasterContext());
     }
 }

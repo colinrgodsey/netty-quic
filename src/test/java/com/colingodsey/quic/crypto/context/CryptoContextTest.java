@@ -4,13 +4,17 @@ import static com.colingodsey.quic.utils.Utils.h2ba;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 
 import java.util.Arrays;
 
+import com.colingodsey.quic.packet.Packet;
 import com.colingodsey.quic.packet.components.ConnectionID;
-import com.colingodsey.quic.packet.components.Header;
-import com.colingodsey.quic.packet.components.LongHeader;
+import com.colingodsey.quic.packet.header.Header;
+import com.colingodsey.quic.packet.header.InitialHeader;
+import com.colingodsey.quic.packet.header.LongHeader;
 import com.colingodsey.quic.utils.Utils;
 
 import javax.crypto.Cipher;
@@ -59,6 +63,8 @@ public class CryptoContextTest {
     final byte[] protectedSample = h2ba("535064a4268a0d9d7b1c9d250ae35516");
     final byte[] testHeader = h2ba(""
             + "c3ff000017088394c8f03e5157080000449e00000002");
+    final byte[] testHeaderReal = h2ba(""
+            + "c0ff000017088394c8f03e5157080000449e02");
     final byte[] testPayload = h2ba(""
             + "060040c4010000c003036660261ff947cea49cce6cfad687f457cf1b14531ba1"
             + "4131a0e8f309a1d0b9c4000006130113031302010000910000000b0009000006"
@@ -165,13 +171,13 @@ public class CryptoContextTest {
                 protectedSample,
                 Arrays.copyOf(ePayload, protectedSample.length));
 
-        byte[] mask = ctx.headerProtectMask(ePayload, pnLength);
+        byte[] mask = ctx.headerProtectMask(ePayload, pnLength, true);
 
         assertArrayEquals(h2ba("833b343aaa87038e612d933506d446a0"), mask);
 
         byte[] encryptedHeader = testHeader.clone();
 
-        //encrypt header flags
+        //encrypt meta flags
         int firstByteMask = (header.isLong() ? 0x0F : 0x1F);
         encryptedHeader[0] ^= mask[0] & firstByteMask;
 
@@ -188,6 +194,38 @@ public class CryptoContextTest {
                 encryptedHeader);
 
         //assertArrayEquals(testEncryptedPacket, Utils.concat(encryptedHeader, ePayload));
+    }
+
+    @Test
+    public void testDecrypt() throws Exception {
+        /*final ByteBuf testPacket = Unpooled.wrappedBuffer(testEncryptedPacket);
+        final TLS_AES_128_GCM_SHA256 clientCtx = new TLS_AES_128_GCM_SHA256(connID, false);
+        final TLS_AES_128_GCM_SHA256 serverCtx = new TLS_AES_128_GCM_SHA256(connID, true);
+
+        final ByteBuf out = Unpooled.buffer();
+
+        //FIX: need to use the right keys here.... thats why these dont match
+        Packet packet = serverCtx.decrypt(testPacket);
+        System.out.println(ByteBufUtil.prettyHexDump(packet.getPayload()));
+        clientCtx.encrypt(packet, out);
+        System.out.println(ByteBufUtil.prettyHexDump(out));*/
+    }
+
+    @Test
+    public void testEncrypt() throws Exception {
+        final TLS_AES_128_GCM_SHA256 clientCtx = new TLS_AES_128_GCM_SHA256(connID, false);
+        final TLS_AES_128_GCM_SHA256 serverCtx = new TLS_AES_128_GCM_SHA256(connID, true);
+
+        final ByteBuf out = Unpooled.buffer();
+        final Packet testPacket = new Packet(
+                Header.read(Unpooled.wrappedBuffer(testHeader)),
+                //new InitialHeader(0xff000017, connID, ConnectionID.EMPTY,  new byte[0], testPayloadPadded.length, 2),
+                Unpooled.wrappedBuffer(testPayloadPadded)
+        );
+
+        clientCtx.encrypt(testPacket, out);
+        final Packet testPacketOut = serverCtx.decrypt(out);
+        System.out.println(ByteBufUtil.prettyHexDump(testPacketOut.getPayload()));
     }
 
     @Test

@@ -6,8 +6,8 @@ import io.netty.util.ReferenceCounted;
 
 import java.util.function.Consumer;
 
-import com.colingodsey.quic.packet.components.LongHeader;
 import com.colingodsey.quic.packet.frame.Frame.Orderable;
+import com.colingodsey.quic.packet.header.LongHeader;
 import com.colingodsey.quic.utils.VariableInt;
 
 public final class Crypto extends AbstractReferenceCounted implements Frame,
