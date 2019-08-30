@@ -86,17 +86,6 @@ public abstract class CryptoContext {
         }
     }
 
-    public byte[] encryptPayload(byte[] header, byte[] payload, int packetNumber) {
-        final Cipher cipher = getPayloadCipher();
-        try {
-            cipher.init(Cipher.ENCRYPT_MODE, getWPayloadKey(), createIV(packetNumber, true));
-            cipher.updateAAD(header);
-            return cipher.doFinal(payload);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     public void decryptPayload(ByteBuf header, ByteBuf payload, int packetNumber, ByteBuf out) {
         final Cipher cipher = getPayloadCipher();
         try {

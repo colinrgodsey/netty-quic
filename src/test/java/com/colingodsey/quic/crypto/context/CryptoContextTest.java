@@ -9,6 +9,7 @@ import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 
 import java.util.Arrays;
+import java.util.Random;
 
 import com.colingodsey.quic.packet.Packet;
 import com.colingodsey.quic.packet.components.ConnectionID;
@@ -158,9 +159,10 @@ public class CryptoContextTest {
         aadBuf.writeShort(0x4000 | (pnLength + testPayload.length + 16));
         Packet.writeFixedLengthInt(packetNumber, pnLength, aadBuf);*/
 
-        final byte[] ePayload = ctx.encryptPayload(
-                testHeader, Utils.concat(testPayload, new byte[800]),
-                packetNumber);
+        final byte[] ePayload = Utils.createBytes(out -> ctx.encryptPayload(
+                Unpooled.wrappedBuffer(testHeader),
+                Unpooled.buffer().writeBytes(testPayload).writeBytes(new byte[800]),
+                packetNumber, out), 1200);
 
         //payload needs to be 1163 before encrypting
         /*Assert.assertArrayEquals(
@@ -234,6 +236,34 @@ public class CryptoContextTest {
                 Utils.createBytes(buf ->
                         buf.writeBytes(testPacketOut.getPayload().duplicate()), 100)
         );
+    }
+
+    @Test
+    public void testEncryptRandomPN() throws Exception {
+        final TLS_AES_128_GCM_SHA256 clientCtx = new TLS_AES_128_GCM_SHA256(connID, false);
+        final TLS_AES_128_GCM_SHA256 serverCtx = new TLS_AES_128_GCM_SHA256(connID, true);
+        final Random r = new Random(96673);
+        final ByteBuf out = Unpooled.buffer();
+
+        for (int i = 0 ; i < 1000 ; i++) {
+            out.clear();
+            final int pn = r.nextInt() >>> 1;
+            final Packet testPacket = new Packet(
+                    new InitialHeader(0xff000017, connID, ConnectionID.EMPTY,
+                            new byte[0], testPayloadPadded.length, pn),
+                    Unpooled.wrappedBuffer(testPayloadPadded)
+            );
+
+            clientCtx.encrypt(testPacket, out);
+            final Packet testPacketOut = serverCtx.decrypt(out);
+
+            assertArrayEquals(
+                    testPayloadPadded,
+                    Utils.createBytes(buf ->
+                            buf.writeBytes(testPacketOut.getPayload().duplicate()), 100)
+            );
+            assertEquals(pn, testPacketOut.getHeader().getPacketNumber());
+        }
     }
 
     @Test

@@ -12,7 +12,7 @@ public class InitialHeader extends LongHeader {
 
     public InitialHeader(int version, ConnectionID sourceID,
             ConnectionID destID, byte[] token, int payloadLength, int packetNumber) {
-        super(Type.INITIAL, getFixedLengthIntBytes(packetNumber), version, sourceID, destID);
+        super(Type.INITIAL, (byte) (getFixedLengthIntBytes(packetNumber) - 1), version, sourceID, destID);
         this.token = token;
         this.payloadLength = payloadLength;
         this.packetNumber = packetNumber;
