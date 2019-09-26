@@ -6,20 +6,43 @@ import io.netty.buffer.ByteBufUtil;
 import java.math.BigInteger;
 import java.util.Arrays;
 
-public final class ConnectionID {
-    public static final ConnectionID EMPTY = new ConnectionID(new byte[0]);
+import com.colingodsey.quic.utils.QUICRandom;
+
+public class ConnectionID {
+    public static final ConnectionID EMPTY = new ConnectionID(new byte[0]) {
+        @Override
+        public String toString() {
+            return "ConnectionID.EMPTY";
+        }
+    };
 
     private final byte[] bytes;
     private volatile int cachedHash = -1;
 
-    public ConnectionID(ByteBuf in) {
-        final int length = in.readUnsignedByte();
-        bytes = new byte[length];
-        assert bytes.length <= 20 : ("too many bytes: " + length);
-        in.readBytes(bytes);
+    public static ConnectionID random() {
+        final int length = 8 + QUICRandom.nextInt(12);
+        return new ConnectionID(QUICRandom.nextBytes(length));
     }
 
-    public ConnectionID(byte[] bytes) {
+    public static ConnectionID read(ByteBuf in) {
+        final int length = in.readUnsignedByte();
+        if (length == 0) {
+            return EMPTY;
+        }
+        final byte[] bytes = new byte[length];
+        assert bytes.length <= 20 : ("too many bytes: " + length);
+        in.readBytes(bytes);
+        return new ConnectionID(bytes);
+    }
+
+    public static ConnectionID read(byte[] bytes) {
+        if (bytes.length == 0) {
+            return EMPTY;
+        }
+        return new ConnectionID(bytes);
+    }
+
+    ConnectionID(byte[] bytes) {
         this.bytes = bytes.clone();
     }
 
@@ -63,6 +86,6 @@ public final class ConnectionID {
     }
 
     public String toString() {
-        return "ConnectionID{" + ByteBufUtil.hexDump(bytes) + '}';
+        return "ConnectionID(" + ByteBufUtil.hexDump(bytes) + ')';
     }
 }

@@ -118,6 +118,19 @@ public class Ack implements Frame, Frame.Initial, Frame.Handshake {
         }
     }
 
+    public int length() {
+        int length = 1 +
+                VariableInt.length(largestAckd) +
+                VariableInt.length(ackDelay) +
+                VariableInt.length(ackRangeCount) +
+                VariableInt.length(firstAck);
+        for (int i = 0 ; i < ackRangeCount ; i++) {
+            length += VariableInt.length(gaps[i]);
+            length += VariableInt.length(acks[i]);
+        }
+        return length;
+    }
+
     public void forEach(LongConsumer ack, LongConsumer gap) {
         long cursor = largestAckd;
 
@@ -134,4 +147,22 @@ public class Ack implements Frame, Frame.Initial, Frame.Handshake {
         }
         return start;
     }
+
+    /*public static final class NackThrowable extends Throwable {
+        public static final NackThrowable INSTANCE = new NackThrowable();
+
+        private NackThrowable() {}
+
+        @Override
+        public Throwable initCause(Throwable cause)
+        {
+            return this;
+        }
+
+        @Override
+        public Throwable fillInStackTrace()
+        {
+            return this;
+        }
+    }*/
 }

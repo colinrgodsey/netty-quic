@@ -2,7 +2,7 @@ package com.colingodsey.quic.utils;
 
 import io.netty.buffer.ByteBuf;
 
-public class VariableInt {
+public final class VariableInt {
     public static long read(final ByteBuf in) {
         final short firstByte = in.readUnsignedByte();
         final int exp = firstByte >> 6;
@@ -42,5 +42,21 @@ public class VariableInt {
         }
 
         return out;
+    }
+
+    public static int length(final long value) {
+        if (value < 0) {
+            throw new IllegalArgumentException("Value for VariableInt must be positive: " + value);
+        } else if ((value >> 6) == 0) {
+            return 1;
+        } else if ((value >> 14) == 0) {
+            return 2;
+        } else if ((value >> 30) == 0) {
+            return 4;
+        } else if ((value >> 62) == 0) {
+            return 8;
+        } else {
+            throw new IllegalArgumentException("Value too big for VariableInt: " + value);
+        }
     }
 }

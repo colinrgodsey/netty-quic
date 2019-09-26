@@ -16,6 +16,20 @@ public class QUICRandom {
         return r.nextInt();
     }
 
+    public static int nextInt(int limit) {
+        return r.nextInt(limit);
+    }
+
+    public static void nextBytes(byte[] bytes) {
+        r.nextBytes(bytes);
+    }
+
+    public static byte[] nextBytes(int n) {
+        final byte[] bytes = new byte[n];
+        r.nextBytes(bytes);
+        return bytes;
+    }
+
     public static byte nextNibble() {
         return (byte) (nextInt() & 0xF);
     }

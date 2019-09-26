@@ -15,7 +15,7 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 public class TLS_AES_128_GCM_SHA256 extends CryptoContext {
-    static final int GCM_BITS = 128;
+    static final int BITS = 128;
     static final HKDF hkdf = HKDF.fromHmacSha256();
 
     final SecretKey wPayload;
@@ -53,6 +53,10 @@ public class TLS_AES_128_GCM_SHA256 extends CryptoContext {
         rHeaderCipher.init(Cipher.ENCRYPT_MODE, expandKey(decryptKey, QUIC_HP_LABEL));
     }
 
+    int getAADLength() {
+        return BITS / 8;
+    }
+
     AlgorithmParameterSpec createIV(int packetNum, boolean isEncrypt) {
         final byte[] nonce = isEncrypt ? wIV.getIV() : rIV.getIV();
         final byte[] pnBytes = BigInteger.valueOf(packetNum).toByteArray();
@@ -60,7 +64,7 @@ public class TLS_AES_128_GCM_SHA256 extends CryptoContext {
         for (int i = 0 ; i < pnBytes.length ; i++) {
             nonce[offset + i] ^= pnBytes[i];
         }
-        return new GCMParameterSpec(GCM_BITS, nonce);
+        return new GCMParameterSpec(BITS, nonce);
     }
 
     Cipher getPayloadCipher() {

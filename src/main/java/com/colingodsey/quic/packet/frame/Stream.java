@@ -24,7 +24,11 @@ public class Stream implements Frame, Orderable {
     }
 
     public void write(ByteBuf out) {
+        throw new UnsupportedOperationException();
+    }
 
+    public int length() {
+        throw new UnsupportedOperationException();
     }
 
     public long getOffset() {

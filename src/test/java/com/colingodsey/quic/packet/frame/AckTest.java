@@ -109,7 +109,7 @@ public class AckTest {
                 }
             }
             new Ack(0, ack, 0).write(tmp.clear());
-            new Ack(tmp).forEach(n -> ack.remove(n), n -> gap.remove(n));
+            new Ack(tmp).forEach(n -> assertTrue(ack.remove(n)), n -> assertTrue(gap.remove(n)));
             assertTrue(ack.isEmpty());
             assertTrue(gap.isEmpty());
         }
@@ -126,7 +126,7 @@ public class AckTest {
                     set.add(n);
                 }
             }
-            new Ack(0, set, 0).forEach(n -> set.remove(n), n -> {});
+            new Ack(0, set, 0).forEach(n -> assertTrue(set.remove(n)), n -> {});
             assertTrue(set.isEmpty());
         }
     }
@@ -142,7 +142,7 @@ public class AckTest {
                     set.add(n);
                 }
             }
-            new Ack(0, set, 0).forEach(n -> set.remove(n), n -> {});
+            new Ack(0, set, 0).forEach(n -> assertTrue(set.remove(n)), n -> {});
             assertTrue(set.isEmpty());
         }
     }

@@ -6,8 +6,8 @@ import io.netty.util.ReferenceCounted;
 
 import java.util.function.Consumer;
 
+import com.colingodsey.quic.packet.Packet;
 import com.colingodsey.quic.packet.frame.Frame.Orderable;
-import com.colingodsey.quic.packet.header.LongHeader;
 import com.colingodsey.quic.utils.VariableInt;
 
 public final class Crypto extends AbstractReferenceCounted implements Frame,
@@ -16,29 +16,34 @@ public final class Crypto extends AbstractReferenceCounted implements Frame,
 
     private final long offset;
     private final ByteBuf payload;
-    private final LongHeader.Type level;
+    private final Packet.Type level;
 
-    public Crypto(LongHeader.Type level, ByteBuf payload) {
+    public Crypto(Packet.Type level, ByteBuf payload) {
         this.offset = -1;
         this.payload = payload;
         this.level = level;
     }
 
-    private Crypto(ByteBuf in, LongHeader.Type level) {
+    private Crypto(ByteBuf in, Packet.Type level) {
         Frame.verifyPacketId(in, PACKET_ID);
         offset = VariableInt.read(in);
         payload = in.readRetainedSlice(VariableInt.readInt(in));
         this.level = level;
     }
 
-    private Crypto(long offset, ByteBuf payload, LongHeader.Type level) {
+    private Crypto(long offset, ByteBuf payload, Packet.Type level) {
         this.offset = offset;
         this.payload = payload;
         this.level = level;
     }
 
-    public static Crypto read(ByteBuf in, LongHeader.Type level) {
+    public static Crypto read(ByteBuf in, Packet.Type level) {
         return new Crypto(in, level);
+    }
+
+    public int length() {
+        return 1 + VariableInt.length(offset) +
+                VariableInt.length(payload.readableBytes()) + payload.readableBytes();
     }
 
     public long splitAndOrder(long offset, int maxLength, Consumer<Crypto> out) {
@@ -78,7 +83,7 @@ public final class Crypto extends AbstractReferenceCounted implements Frame,
         return offset;
     }
 
-    public LongHeader.Type getLevel() {
+    public Packet.Type getLevel() {
         return level;
     }
 

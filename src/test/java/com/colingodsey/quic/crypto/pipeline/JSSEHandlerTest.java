@@ -6,8 +6,8 @@ import static org.junit.Assert.assertNotNull;
 import io.netty.channel.embedded.QUICTestChannel;
 
 import com.colingodsey.quic.QUIC;
+import com.colingodsey.quic.packet.Packet;
 import com.colingodsey.quic.packet.frame.Crypto;
-import com.colingodsey.quic.packet.header.LongHeader;
 import com.colingodsey.quic.utils.TestFrameCodec;
 import com.colingodsey.quic.utils.TestSSLContext;
 
@@ -44,7 +44,7 @@ public class JSSEHandlerTest {
         System.gc();
     }
 
-    void checkForward(QUICTestChannel from, LongHeader.Type type, QUICTestChannel to) {
+    void checkForward(QUICTestChannel from, Packet.Type type, QUICTestChannel to) {
         from.runPendingTasks();
         to.runPendingTasks();
 
@@ -76,18 +76,18 @@ public class JSSEHandlerTest {
     }
 
     void testHandshake(QUICTestChannel client, QUICTestChannel server) {
-        checkForward(client, LongHeader.Type.INITIAL, server); //CH
-        checkForward(server, LongHeader.Type.INITIAL, client); //SH
+        checkForward(client, Packet.Type.INITIAL, server); //CH
+        checkForward(server, Packet.Type.INITIAL, client); //SH
 
         assertNotNull(QUIC.config(server).getHandshakeContext());
         assertNotNull(QUIC.config(client).getHandshakeContext());
 
         while (!server.outboundMessages().isEmpty()) {
-            checkForward(server, LongHeader.Type.HANDSHAKE, client); //EE, CERT, CV, FIN
+            checkForward(server, Packet.Type.HANDSHAKE, client); //EE, CERT, CV, FIN
         }
 
-        checkForward(client, LongHeader.Type.HANDSHAKE, server); //FIN
-        checkForward(client, LongHeader.Type.HANDSHAKE, server); //NewSessionTicket
+        checkForward(client, Packet.Type.HANDSHAKE, server); //FIN
+        checkForward(client, Packet.Type.HANDSHAKE, server); //NewSessionTicket
 
         assertNotNull(QUIC.config(server).getMasterContext());
         assertNotNull(QUIC.config(client).getMasterContext());

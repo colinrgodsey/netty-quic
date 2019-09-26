@@ -4,6 +4,7 @@ import io.netty.buffer.ByteBuf;
 
 import com.colingodsey.quic.utils.VariableInt;
 
+//TODO: make high priority
 public class Ping implements Frame {
     public static final int PACKET_ID = 0x01;
     public static final Ping INSTANCE = new Ping();
@@ -14,6 +15,10 @@ public class Ping implements Frame {
     }
 
     private Ping() {}
+
+    public int length() {
+        return 1;
+    }
 
     public void write(ByteBuf out) {
         VariableInt.write(PACKET_ID, out);

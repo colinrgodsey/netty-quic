@@ -21,8 +21,8 @@ public class VersionNegotiation {
         this.versions = versions;
     }
 
-    public void write(ByteBuf out) {
-        meta.write(out);
+    public void writeHeader(ByteBuf out) {
+        meta.writeHeader(out);
         for (int version : versions) {
             out.writeInt(version);
         }

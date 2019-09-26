@@ -11,8 +11,8 @@ import java.util.List;
 
 import com.colingodsey.quic.QUIC;
 import com.colingodsey.quic.crypto.context.CryptoContext;
+import com.colingodsey.quic.packet.Packet;
 import com.colingodsey.quic.packet.frame.Crypto;
-import com.colingodsey.quic.packet.header.LongHeader;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
@@ -91,9 +91,9 @@ public class JSSEHandler extends SimpleChannelInboundHandler<Crypto> {
         dirty = true;
     }
 
-    protected LongHeader.Type getEncryptionLevel() {
+    protected Packet.Type getEncryptionLevel() {
         final boolean helloDone = (isServer && helloSent) || (!isServer && helloReceived);
-        return helloDone ? LongHeader.Type.HANDSHAKE : LongHeader.Type.INITIAL;
+        return helloDone ? Packet.Type.HANDSHAKE : Packet.Type.INITIAL;
     }
 
     protected void processHandshake0(ChannelHandlerContext ctx) {

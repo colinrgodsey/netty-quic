@@ -1,18 +1,15 @@
 package com.colingodsey.quic.packet.frame;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 
 import java.util.function.Consumer;
 
-import com.colingodsey.quic.packet.header.LongHeader;
+import com.colingodsey.quic.packet.Packet;
 import com.colingodsey.quic.utils.VariableInt;
 
 public interface Frame {
-    static Frame readFrame(ByteBuf in) {
-        return readFrame(in, null);
-    }
-
-    static Frame readFrame(ByteBuf in, LongHeader.Type level) {
+    static Frame read(ByteBuf in, Packet.Type level) {
         final int readerIndex = in.readerIndex();
         final int frameId = VariableInt.readInt(in);
         in.readerIndex(readerIndex);
@@ -64,9 +61,16 @@ public interface Frame {
     }
 
     void write(ByteBuf out);
+    int length();
 
-    default LongHeader.Type getLevel() {
+    default Packet.Type getLevel() {
         return null;
+    }
+
+    default ByteBuf produce(ByteBufAllocator alloc) {
+        final ByteBuf out = alloc.ioBuffer(length());
+        write(out);
+        return out;
     }
 
     interface Initial extends Frame {}

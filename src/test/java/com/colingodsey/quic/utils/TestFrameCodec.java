@@ -16,6 +16,6 @@ public class TestFrameCodec extends MessageToMessageCodec<ByteBuf, Frame> {
     }
 
     protected void decode(ChannelHandlerContext ctx, ByteBuf msg, List<Object> out) throws Exception {
-        out.add(Frame.readFrame(msg));
+        out.add(Frame.read(msg, null));
     }
 }

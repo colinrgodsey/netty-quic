@@ -16,10 +16,10 @@ public class VariableIntTest {
     final ByteBuf b = Unpooled.buffer();
 
     {
-        values.add(new Tuple<>(151288809941952652L,  b.copy().writeLong( 0xc2197c5eff14e88cL)));
-        values.add(new Tuple<>(494878333L,           b.copy().writeInt(          0x9d7f3e7d)));
-        values.add(new Tuple<>(15293L,               b.copy().writeShort(            0x7bbd)));
-        values.add(new Tuple<>(37L,                  b.copy().writeByte(               0x25)));
+        values.add(Tuple.create(151288809941952652L,  b.copy().writeLong( 0xc2197c5eff14e88cL)));
+        values.add(Tuple.create(494878333L,           b.copy().writeInt(          0x9d7f3e7d)));
+        values.add(Tuple.create(15293L,               b.copy().writeShort(            0x7bbd)));
+        values.add(Tuple.create(37L,                  b.copy().writeByte(               0x25)));
     }
 
     @Test
