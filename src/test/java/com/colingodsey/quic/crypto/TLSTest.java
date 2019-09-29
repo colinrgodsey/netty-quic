@@ -6,19 +6,18 @@ import static org.junit.Assert.assertTrue;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-import com.colingodsey.quic.crypto.context.TLS_AES_128_GCM_SHA256;
-
+import com.colingodsey.quic.config.TransportParams;
 import com.colingodsey.quic.utils.TestSSLContext;
-import javax.crypto.SecretKey;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
 import javax.net.ssl.SSLEngineResult.HandshakeStatus;
 import javax.net.ssl.SSLSession;
 
 import org.junit.Test;
+import org.openjsse.javax.net.ssl.ExtendedSSLSession;
 import org.openjsse.javax.net.ssl.SSLParameters;
 
-public class CryptoTest {
+public class TLSTest {
     @Test
     public void jvmTest() {
         SSLEngine engine = TestSSLContext.sslContext.createSSLEngine();
@@ -30,24 +29,30 @@ public class CryptoTest {
                 Arrays.asList(engine.getEnabledCipherSuites()).contains("TLS_AES_128_GCM_SHA256"));
     }
 
-    void setQuicParam(SSLEngine engine, String name, long value) {
+    /*void setQuicParam(SSLEngine engine, TransportParams.Type type, long value) {
         SSLParameters params = (SSLParameters) engine.getSSLParameters();
-        params.setQuicTransParam(name, value);
+        //params.setQUICTransParams(type, value);
         engine.setSSLParameters(params);
-    }
+    }*/
 
     @Test
     public void rawHandshake() throws Exception {
         SSLEngine client = TestSSLContext.sslContext.createSSLEngine("dummy.example.com", 80);
         SSLEngine server = TestSSLContext.sslContext.createSSLEngine();
+        ByteBuffer clientTPBytes = ByteBuffer.wrap(new byte[] {1, 1});
+        ByteBuffer serverTPBytes = ByteBuffer.wrap(new byte[] {1, 2});
 
         client.setUseClientMode(true);
         server.setUseClientMode(false);
         server.setWantClientAuth(true);
 
-        setQuicParam(server, "initial_max_streams_bidi", 10);
-        setQuicParam(server, "initial_max_stream_data_uni", 1000);
-        setQuicParam(client, "initial_max_streams_uni", 10);
+        SSLParameters sParams = (SSLParameters) server.getSSLParameters();
+        sParams.setQUICTransParams(serverTPBytes);
+        server.setSSLParameters(sParams);
+
+        SSLParameters cParams = (SSLParameters) client.getSSLParameters();
+        cParams.setQUICTransParams(clientTPBytes);
+        client.setSSLParameters(cParams);
 
         boolean dataDone = false;
         int itrs = 200;
@@ -115,21 +120,8 @@ public class CryptoTest {
         assertTrue(server.isInboundDone());
         assertEquals("TLS_AES_128_GCM_SHA256", client.getSession().getCipherSuite());
 
-        /*new TLS_AES_128_GCM_SHA256((SecretKey) client.getSession().getValue("tls13_handshake_secret"));
-        new TLS_AES_128_GCM_SHA256((SecretKey) server.getSession().getValue("tls13_handshake_secret"));
-
-        new TLS_AES_128_GCM_SHA256((SecretKey) client.getSession().getValue("tls13_master_secret"));
-        new TLS_AES_128_GCM_SHA256((SecretKey) server.getSession().getValue("tls13_master_secret"));*/
-
-        System.out.println("Client session values: ");
-        for (String key : client.getSession().getValueNames()) {
-            System.out.println("  " + key + ": " + client.getSession().getValue(key));
-        }
-
-        System.out.println("\nServer session values: ");
-        for (String key : server.getSession().getValueNames()) {
-            System.out.println("  " + key + ": " + server.getSession().getValue(key));
-        }
+        assertEquals(clientTPBytes, ((ExtendedSSLSession) server.getSession()).getQUICTransParams());
+        assertEquals(serverTPBytes, ((ExtendedSSLSession) client.getSession()).getQUICTransParams());
     }
 
     private static void checkTransfer(ByteBuffer a, ByteBuffer b)
