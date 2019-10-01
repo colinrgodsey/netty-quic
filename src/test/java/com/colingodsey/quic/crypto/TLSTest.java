@@ -6,7 +6,6 @@ import static org.junit.Assert.assertTrue;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-import com.colingodsey.quic.config.TransportParams;
 import com.colingodsey.quic.utils.TestSSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
@@ -60,8 +59,6 @@ public class TLSTest {
         final SSLSession clientSession = client.getSession();
         final int appBufferMax = clientSession.getApplicationBufferSize();
         final int netBufferMax = clientSession.getPacketBufferSize();
-
-        clientSession.putValue("test", 1);
 
         final ByteBuffer clientOut = ByteBuffer.wrap("Hi Server, I'm Client".getBytes());
         final ByteBuffer clientIn = ByteBuffer.allocateDirect(appBufferMax + 64);

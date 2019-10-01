@@ -44,6 +44,28 @@ public class JSSEHandlerTest {
         System.gc();
     }
 
+    @Test
+    public void testTransParams() {
+        QUICTestChannel client = new QUICTestChannel(
+                cfg -> {
+                    cfg.setFrameSplitSize(17);
+                    cfg.getLocalTransport().setMaxData(555);
+                },
+                new TestFrameCodec(),
+                new CryptoOrdering(),
+                new JSSEHandler(false, TestSSLContext.sslContext)
+        );
+        QUICTestChannel server = new QUICTestChannel(
+                new TestFrameCodec(),
+                new CryptoOrdering(),
+                new JSSEHandler(true, TestSSLContext.sslContext)
+        );
+
+        flushUntilEmpty(client, server);
+        assertEquals(555, QUIC.config(server).getRemoteTransport().getMaxData());
+        System.gc();
+    }
+
     void checkForward(QUICTestChannel from, Packet.Type type, QUICTestChannel to) {
         from.runPendingTasks();
         to.runPendingTasks();

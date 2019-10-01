@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.colingodsey.quic.QUIC;
+import com.colingodsey.quic.crypto.TLS;
 import com.colingodsey.quic.crypto.context.CryptoContext;
 import com.colingodsey.quic.packet.Packet;
 import com.colingodsey.quic.packet.frame.Crypto;
@@ -21,6 +22,8 @@ import javax.net.ssl.SSLEngineResult.HandshakeStatus;
 import javax.net.ssl.SSLEngineResult.Status;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLSession;
+import org.openjsse.javax.net.ssl.ExtendedSSLSession;
+import org.openjsse.javax.net.ssl.SSLParameters;
 
 public class JSSEHandler extends SimpleChannelInboundHandler<Crypto> {
     static final ByteBuffer EMPTY_BYTEBUFFER = ByteBuffer.wrap(new byte[0]);
@@ -33,6 +36,7 @@ public class JSSEHandler extends SimpleChannelInboundHandler<Crypto> {
     boolean helloReceived = false;
     boolean helloSent = false;
     boolean awaitingInput = true;
+    boolean flushedTransParams = false;
 
     public JSSEHandler(boolean isServer, SSLContext context) {
         this.isServer = isServer;
@@ -134,6 +138,11 @@ public class JSSEHandler extends SimpleChannelInboundHandler<Crypto> {
             session = engine.getSession();
         }
 
+        if (config.getRemoteTransport() instanceof TLS.TransportParams.ValueConsume) {
+            final ByteBuffer transParams = ((ExtendedSSLSession) session).getQUICTransParams();
+            ((TLS.TransportParams.ValueConsume) config.getRemoteTransport()).consumeTLS(transParams);
+        }
+
         try {
             if (engine instanceof org.openjsse.javax.net.ssl.SSLEngine && session != null) {
                 final org.openjsse.javax.net.ssl.SSLEngine openEngine = (org.openjsse.javax.net.ssl.SSLEngine) engine;
@@ -181,6 +190,13 @@ public class JSSEHandler extends SimpleChannelInboundHandler<Crypto> {
     }
 
     protected void processHandshake(ChannelHandlerContext ctx) {
+        if (!flushedTransParams && QUIC.config(ctx).getLocalTransport() instanceof TLS.TransportParams.ValueProduce) {
+            SSLParameters sParams = (SSLParameters) engine.getSSLParameters();
+            sParams.setQUICTransParams(((TLS.TransportParams.ValueProduce) QUIC.config(ctx).getLocalTransport()).produceDirtyTLS());
+            engine.setSSLParameters(sParams);
+            flushedTransParams = true;
+        }
+
         processHandshake0(ctx);
 
         while (shouldWrap() || shouldUnwrap()) {

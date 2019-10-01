@@ -4,7 +4,6 @@ import io.netty.channel.Channel;
 import io.netty.channel.DefaultChannelConfig;
 
 import com.colingodsey.quic.QUIC;
-import com.colingodsey.quic.QUIC.Config.Transport.Mutable;
 import com.colingodsey.quic.crypto.context.CryptoContext;
 
 public class DefaultConfig extends DefaultChannelConfig implements QUIC.Config {
@@ -48,11 +47,11 @@ public class DefaultConfig extends DefaultChannelConfig implements QUIC.Config {
         frameSplitSize = size;
     }
 
-    public Transport getRemoteTransport() {
+    public Transport.Immutable getRemoteTransport() {
         return remoteTransport;
     }
 
-    public Mutable getLocalTransport() {
+    public Transport.Mutable getLocalTransport() {
         return localTransport;
     }
 }

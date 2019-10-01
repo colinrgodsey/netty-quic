@@ -1,10 +1,14 @@
 package com.colingodsey.quic;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelConfig;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOption;
 
+import java.nio.ByteBuffer;
+
+import com.colingodsey.quic.config.TransportConfig;
 import com.colingodsey.quic.crypto.context.CryptoContext;
 import com.colingodsey.quic.packet.components.ConnectionID;
 
@@ -41,7 +45,7 @@ public class QUIC {
         int getFrameSplitSize();
         void setFrameSplitSize(int size);
 
-        Transport getRemoteTransport();
+        Transport.Immutable getRemoteTransport();
         Transport.Mutable getLocalTransport();
 
         //TODO: preferred_address
@@ -60,6 +64,8 @@ public class QUIC {
             int getMaxAckDelay();
             boolean isDisableMigration();
             int getActiveConnectionIdLimit();
+
+            interface Immutable extends Transport {}
 
             interface Mutable extends Transport {
                 void setOriginalConnectionID(ConnectionID originalConnectionID);

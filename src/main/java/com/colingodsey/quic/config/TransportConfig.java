@@ -2,15 +2,23 @@ package com.colingodsey.quic.config;
 
 import static com.colingodsey.quic.QUIC.*;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelOption;
 
+import java.nio.ByteBuffer;
 import java.text.MessageFormat;
-import java.util.Set;
+import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 import com.colingodsey.quic.QUIC;
+import com.colingodsey.quic.crypto.TLS;
+import com.colingodsey.quic.crypto.TLS.TransportParams;
 import com.colingodsey.quic.packet.components.ConnectionID;
+import com.colingodsey.quic.utils.VariableInt;
 
+//TODO: package-protected access class ?
 public class TransportConfig {
     final ChannelOption<?>[] OPTIONS = new ChannelOption<?>[] {
         ORIGINAL_CONNECTION_ID, IDLE_TIMEOUT, STATELESS_RESET_TOKEN,
@@ -20,19 +28,94 @@ public class TransportConfig {
         ACTIVE_CONNECTION_ID_LIMIT
     };
 
-    static public class Remote extends Core implements QUIC.Config.Transport {
+    static public class Remote extends Core implements QUIC.Config.Transport.Immutable, TLS.TransportParams.ValueConsume {
+        public void consumeTLS(ByteBuf data) {
+            boolean disableMigration = false;
+            while (data.isReadable()) {
+                final TransportParams key = TransportParams.get(data.readUnsignedShort());
+                switch (key) {
+                    case original_connection_id: {
+                        setOriginalConnectionID(ConnectionID.read(data));
+                        break;
+                    }
+                    case stateless_reset_token: {
+                        byte[] bytes = new byte[16];
+                        data.readBytes(bytes);
+                        setStatelessResetToken(bytes);
+                        break;
+                    }
+                    case disable_migration:
+                        disableMigration = true;
+                        break;
+                    //case preferred_address: //TODO: Preferred Address format
+                    //    throw new UnsupportedOperationException();
+                    default:
+                        setOptionLong(key.option, VariableInt.read(data));
+                }
+            }
+            setDisableMigration(disableMigration);
+        }
+
+        public void consumeTLS(ByteBuffer data) {
+            if (data != null) {
+                consumeTLS(Unpooled.wrappedBuffer(data));
+            }
+        }
+        
         protected void dirty(ChannelOption<?> option) {
             // NOOP
         }
     }
 
-    static public class Local extends Core implements QUIC.Config.Transport.Mutable {
-        Set<ChannelOption<?>> dirtySet =
-                new ConcurrentHashMap<ChannelOption<?>, Object>().keySet();
+    static public class Local extends Core implements QUIC.Config.Transport.Mutable, TLS.TransportParams.ValueProduce {
+        ConcurrentHashMap<ChannelOption<?>, Object> dirtySet = new ConcurrentHashMap<>();
+
+        public ByteBuffer produceDirtyTLS() {
+            final ByteBuf buffer = Unpooled.buffer(64);
+
+            produceDirty(option -> {
+                if (option == DISABLE_MIGRATION && !isDisableMigration()) {
+                    return;
+                }
+
+                buffer.writeShort(TransportParams.get(option).id);
+                if (option == ORIGINAL_CONNECTION_ID) {
+                    getOriginalConnectionID().write(buffer);
+                } else if (option == STATELESS_RESET_TOKEN) {
+                    buffer.writeBytes(getStatelessResetToken());
+                } else if (option == DISABLE_MIGRATION) {
+                    // no value here
+                /*} else if (option == preferred_address) {
+
+                }*/
+                } else {
+                    VariableInt.write(getOptionLong(option), buffer);
+                }
+            });
+
+            if (buffer.isReadable()) {
+                return buffer.nioBuffer();
+            } else {
+                return null;
+            }
+        }
+
+        public void produceDirty(Consumer<ChannelOption<?>> consumer) {
+            final Iterator<ChannelOption<?>> itr = dirtySet.keySet().iterator();
+            while (itr.hasNext()) {
+                final ChannelOption<?> option = itr.next();
+                itr.remove();
+                consumer.accept(option);
+            }
+        }
 
         protected void dirty(ChannelOption<?> option) {
-            dirtySet.add(option);
+            dirtySet.put(option, this);
         }
+    }
+
+    static public abstract class LocalProducer {
+
     }
 
     static abstract class Core {
@@ -132,21 +215,28 @@ public class TransportConfig {
         }
 
         public void setMaxData(long maxData) {
+            checkArgument(this.maxData, Long.MAX_VALUE, maxData, "maxData");
             this.maxData = maxData;
-            dirty(QUIC.MAX_DATA);
+            dirty(MAX_DATA);
         }
 
         public void setMaxStreamDataBiDiLocal(long maxStreamDataBiDiLocal) {
+            checkArgument(this.maxStreamDataBiDiLocal, Long.MAX_VALUE,
+                    maxStreamDataBiDiLocal, "maxStreamDataBiDiLocal");
             this.maxStreamDataBiDiLocal = maxStreamDataBiDiLocal;
             dirty(MAX_STREAM_DATA_BIDI_LOCAL);
         }
 
         public void setMaxStreamDataBiDiRemote(long maxStreamDataBiDiRemote) {
+            checkArgument(this.maxStreamDataBiDiRemote, Long.MAX_VALUE,
+                    maxStreamDataBiDiRemote, "maxStreamDataBiDiLocal");
             this.maxStreamDataBiDiRemote = maxStreamDataBiDiRemote;
             dirty(MAX_STREAM_DATA_BIDI_REMOTE);
         }
 
         public void setMaxStreamDataUni(long maxStreamDataUni) {
+            checkArgument(this.maxStreamDataUni, Long.MAX_VALUE,
+                    maxStreamDataUni, "maxStreamDataUni");
             this.maxStreamDataUni = maxStreamDataUni;
             dirty(MAX_STREAM_DATA_UNI);
         }
