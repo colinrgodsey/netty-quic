@@ -7,7 +7,7 @@ import java.util.List;
 
 import com.colingodsey.quic.QUIC;
 import com.colingodsey.quic.packet.frame.Crypto;
-import com.colingodsey.quic.pipeline.components.FrameOrdering;
+import com.colingodsey.quic.pipeline.component.FrameOrdering;
 
 public class CryptoOrdering extends MessageToMessageCodec<Crypto, Crypto> {
     protected FrameOrdering<Crypto> inQueue = new FrameOrdering<>();

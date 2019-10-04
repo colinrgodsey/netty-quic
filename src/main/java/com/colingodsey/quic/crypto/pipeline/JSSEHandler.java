@@ -8,6 +8,10 @@ import java.nio.ByteBuffer;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import com.colingodsey.quic.QUIC;
 import com.colingodsey.quic.crypto.TLS;
@@ -22,12 +26,18 @@ import javax.net.ssl.SSLEngineResult.HandshakeStatus;
 import javax.net.ssl.SSLEngineResult.Status;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLSession;
+
 import org.openjsse.javax.net.ssl.ExtendedSSLSession;
 import org.openjsse.javax.net.ssl.SSLParameters;
 
 public class JSSEHandler extends SimpleChannelInboundHandler<Crypto> {
+    static final ExecutorService defaultBlockingExecutor = new ThreadPoolExecutor(
+            0, 128,
+            60L, TimeUnit.SECONDS,
+            new SynchronousQueue<>());
     static final ByteBuffer EMPTY_BYTEBUFFER = ByteBuffer.wrap(new byte[0]);
 
+    final ExecutorService blockingExecutor;
     final boolean isServer;
     final SSLEngine engine;
 
@@ -38,12 +48,29 @@ public class JSSEHandler extends SimpleChannelInboundHandler<Crypto> {
     boolean awaitingInput = true;
     boolean flushedTransParams = false;
 
-    public JSSEHandler(boolean isServer, SSLContext context) {
-        this.isServer = isServer;
+    public JSSEHandler(SSLContext context, ExecutorService backgroundExecutor) {
+        isServer = true;
         engine = context.createSSLEngine();
-        engine.setUseClientMode(!isServer);
-        if (isServer) {
-            engine.setWantClientAuth(true);
+        engine.setUseClientMode(false);
+        engine.setWantClientAuth(true);
+        this.blockingExecutor = backgroundExecutor == null ?
+                defaultBlockingExecutor : backgroundExecutor;
+    }
+
+    public JSSEHandler(SSLContext context, String host, int port, ExecutorService backgroundExecutor) {
+        isServer = false;
+        engine = context.createSSLEngine(host, port);
+        engine.setUseClientMode(true);
+        this.blockingExecutor = backgroundExecutor == null ?
+                defaultBlockingExecutor : backgroundExecutor;
+    }
+
+    @Override
+    public void channelActive(ChannelHandlerContext ctx) {
+        ctx.fireChannelActive();
+        if (!isServer) {
+            processHandshake(ctx);
+            maybeFlush(ctx);
         }
     }
 
@@ -51,13 +78,6 @@ public class JSSEHandler extends SimpleChannelInboundHandler<Crypto> {
     public void handlerAdded(ChannelHandlerContext ctx) {
         inBuffer = newHandshakeBuffer(ctx);
         outBuffer = newHandshakeBuffer(ctx);
-        ctx.channel().eventLoop().execute(() -> {
-            //ctx.fireChannelActive();
-            if (!isServer) {
-                processHandshake(ctx);
-                maybeFlush(ctx);
-            }
-        });
     }
 
     @Override
@@ -68,6 +88,7 @@ public class JSSEHandler extends SimpleChannelInboundHandler<Crypto> {
         if (outBuffer != null) {
             outBuffer.release();
         }
+        engine.closeOutbound();
         inBuffer = null;
         outBuffer = null;
     }
@@ -100,7 +121,7 @@ public class JSSEHandler extends SimpleChannelInboundHandler<Crypto> {
         return helloDone ? Packet.Type.HANDSHAKE : Packet.Type.INITIAL;
     }
 
-    protected void processHandshake0(ChannelHandlerContext ctx) {
+    protected void processHandshakeIteration(ChannelHandlerContext ctx) {
         try {
             final SSLEngineResult readRes = engine.unwrap(inBuffer.nioBuffer(), EMPTY_BYTEBUFFER);
             final SSLEngineResult writeRes = engine.wrap(EMPTY_BYTEBUFFER,
@@ -126,7 +147,7 @@ public class JSSEHandler extends SimpleChannelInboundHandler<Crypto> {
 
             checkKeys(ctx);
         } catch (SSLException e) {
-            throw new RuntimeException(e);
+            ctx.fireExceptionCaught(e);
         }
     }
 
@@ -138,10 +159,8 @@ public class JSSEHandler extends SimpleChannelInboundHandler<Crypto> {
             session = engine.getSession();
         }
 
-        if (config.getRemoteTransport() instanceof TLS.TransportParams.ValueConsume) {
-            final ByteBuffer transParams = ((ExtendedSSLSession) session).getQUICTransParams();
-            ((TLS.TransportParams.ValueConsume) config.getRemoteTransport()).consumeTLS(transParams);
-        }
+        final ByteBuffer transParams = ((ExtendedSSLSession) session).getQUICTransParams();
+        TLS.TransportParams.consumeTransportParams(transParams, QUIC.config(ctx).getRemoteTransport());
 
         try {
             if (engine instanceof org.openjsse.javax.net.ssl.SSLEngine && session != null) {
@@ -162,7 +181,7 @@ public class JSSEHandler extends SimpleChannelInboundHandler<Crypto> {
                 }
             }
         } catch (GeneralSecurityException e) {
-            throw new RuntimeException(e);
+            ctx.fireExceptionCaught(e);
         }
     }
 
@@ -190,30 +209,33 @@ public class JSSEHandler extends SimpleChannelInboundHandler<Crypto> {
     }
 
     protected void processHandshake(ChannelHandlerContext ctx) {
-        if (!flushedTransParams && QUIC.config(ctx).getLocalTransport() instanceof TLS.TransportParams.ValueProduce) {
-            SSLParameters sParams = (SSLParameters) engine.getSSLParameters();
-            sParams.setQUICTransParams(((TLS.TransportParams.ValueProduce) QUIC.config(ctx).getLocalTransport()).produceDirtyTLS());
+        if (!flushedTransParams) {
+            final SSLParameters sParams = (SSLParameters) engine.getSSLParameters();
+            sParams.setQUICTransParams(TLS.TransportParams.produceTransportParams(
+                    QUIC.config(ctx).getLocalTransport()));
             engine.setSSLParameters(sParams);
             flushedTransParams = true;
         }
 
-        processHandshake0(ctx);
+        processHandshakeIteration(ctx);
 
         while (shouldWrap() || shouldUnwrap()) {
-            processHandshake0(ctx);
+            processHandshakeIteration(ctx);
         }
 
         if (engine.getHandshakeStatus() == HandshakeStatus.NEED_TASK) {
             final List<Runnable> taskList = new ArrayList<>();
             Runnable runnable;
-            //TODO: should these go to a different event group?
             while ((runnable = engine.getDelegatedTask()) != null) {
                 taskList.add(runnable);
             }
-            taskList.add(() -> processHandshake(ctx));
-            taskList.add(() -> checkKeys(ctx));
-            taskList.add(() -> maybeFlush(ctx));
-            ctx.channel().eventLoop().execute(() -> taskList.forEach(Runnable::run));
+            assert !taskList.isEmpty() : "NEED_TASK lies";
+            taskList.add(() -> ctx.channel().eventLoop().execute(() -> {
+                processHandshake(ctx);
+                checkKeys(ctx);
+                maybeFlush(ctx);
+            }));
+            blockingExecutor.execute(() -> taskList.forEach(Runnable::run));
         }
     }
 }

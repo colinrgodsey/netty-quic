@@ -16,6 +16,7 @@ import static com.colingodsey.quic.QUIC.ORIGINAL_CONNECTION_ID;
 import static com.colingodsey.quic.QUIC.STATELESS_RESET_TOKEN;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelOption;
 
 import java.nio.ByteBuffer;
@@ -23,7 +24,10 @@ import java.security.Security;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.colingodsey.quic.QUIC;
+import com.colingodsey.quic.packet.component.ConnectionID;
 import com.colingodsey.quic.utils.QUICRandom;
+import com.colingodsey.quic.utils.VariableInt;
 import javax.net.ssl.SSLContext;
 
 public class TLS {
@@ -76,16 +80,85 @@ public class TLS {
             }
         }
 
-        static public TransportParams get(ChannelOption<?> option) {
+        public static TransportParams get(ChannelOption<?> option) {
             return optionMap.get(option);
         }
 
-        static public TransportParams get(int id) {
+        public static TransportParams get(int id) {
             TransportParams out = idMap[id];
             if (out == null) {
                 throw new IllegalArgumentException("Unknown QUIC Transport Param: " + id);
             }
             return out;
+        }
+
+        public static ByteBuffer produceTransportParams(QUIC.Config.Transport config) {
+            if (config instanceof QUIC.Config.Transport.Accessor) {
+                return produceTransportParams((QUIC.Config.Transport.Accessor) config);
+            }
+            return null;
+        }
+
+        @SuppressWarnings("unchecked")
+        public static ByteBuffer produceTransportParams(QUIC.Config.Transport.Accessor accessor) {
+            final ByteBuf buffer = Unpooled.buffer(64);
+
+            accessor.produceDirty(option -> {
+                if (option == DISABLE_MIGRATION && !accessor.getOption(DISABLE_MIGRATION)) {
+                    return;
+                }
+
+                buffer.writeShort(TransportParams.get(option).id);
+                if (option == ORIGINAL_CONNECTION_ID) {
+                    accessor.getOption(ORIGINAL_CONNECTION_ID).write(buffer);
+                } else if (option == STATELESS_RESET_TOKEN) {
+                    buffer.writeBytes(accessor.getOption(STATELESS_RESET_TOKEN));
+                } else if (option == DISABLE_MIGRATION) {
+                    // no value here
+                /*} else if (option == preferred_address) {
+
+                }*/
+                } else {
+                    VariableInt.write(accessor.getOptionLong((ChannelOption<Long>) option), buffer);
+                }
+            });
+
+            if (buffer.isReadable()) {
+                return buffer.nioBuffer();
+            } else {
+                return null;
+            }
+        }
+
+        @SuppressWarnings("unchecked")
+        public static void consumeTransportParams(ByteBuf data, QUIC.Config.Transport.Accessor accessor) {
+            boolean disableMigration = false;
+            while (data.isReadable()) {
+                final ChannelOption<?> option = getOption(data.readUnsignedShort());
+                if (option == ORIGINAL_CONNECTION_ID) {
+                    accessor.setOption(ORIGINAL_CONNECTION_ID, ConnectionID.read(data));
+                } else if (option == STATELESS_RESET_TOKEN) {
+                    byte[] bytes = new byte[16];
+                    data.readBytes(bytes);
+                    accessor.setOption(STATELESS_RESET_TOKEN, bytes);
+                } else if (option == DISABLE_MIGRATION) {
+                    disableMigration = true;
+                } else {
+                    accessor.setOptionLong((ChannelOption<Long>) option, VariableInt.read(data));
+                }
+            }
+            accessor.setOption(DISABLE_MIGRATION, disableMigration);
+        }
+
+        public static void consumeTransportParams(ByteBuffer data, QUIC.Config.Transport config) {
+            if (data != null && config instanceof QUIC.Config.Transport.Accessor) {
+                consumeTransportParams(Unpooled.wrappedBuffer(data),
+                        (QUIC.Config.Transport.Accessor) config);
+            }
+        }
+
+        static ChannelOption<?> getOption(int id) {
+            return get(id).option;
         }
 
         public final int id;
@@ -94,14 +167,6 @@ public class TLS {
         TransportParams(int id, ChannelOption<?> option) {
             this.id = id;
             this.option = option;
-        }
-
-        public interface ValueConsume {
-            void consumeTLS(ByteBuffer data);
-        }
-
-        public interface ValueProduce {
-            ByteBuffer produceDirtyTLS();
         }
     }
 }

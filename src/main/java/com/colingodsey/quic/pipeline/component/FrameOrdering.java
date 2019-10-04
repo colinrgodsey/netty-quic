@@ -1,4 +1,4 @@
-package com.colingodsey.quic.pipeline.components;
+package com.colingodsey.quic.pipeline.component;
 
 import io.netty.util.ReferenceCountUtil;
 

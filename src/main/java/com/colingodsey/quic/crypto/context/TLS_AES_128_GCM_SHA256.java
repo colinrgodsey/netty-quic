@@ -6,7 +6,7 @@ import java.security.spec.AlgorithmParameterSpec;
 
 import at.favre.lib.crypto.HKDF;
 
-import com.colingodsey.quic.packet.components.ConnectionID;
+import com.colingodsey.quic.packet.component.ConnectionID;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;

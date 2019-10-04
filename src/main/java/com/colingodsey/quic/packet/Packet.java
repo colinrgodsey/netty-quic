@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-import com.colingodsey.quic.packet.components.ConnectionID;
+import com.colingodsey.quic.packet.component.ConnectionID;
 import com.colingodsey.quic.packet.frame.Frame;
 import com.colingodsey.quic.packet.frame.Padding;
 import com.colingodsey.quic.utils.QUICRandom;

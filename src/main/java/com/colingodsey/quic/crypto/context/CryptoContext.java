@@ -12,7 +12,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.spec.AlgorithmParameterSpec;
 
 import com.colingodsey.quic.packet.Packet;
-import com.colingodsey.quic.packet.components.ConnectionID;
+import com.colingodsey.quic.packet.component.ConnectionID;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;

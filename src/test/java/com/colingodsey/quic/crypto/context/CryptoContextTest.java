@@ -14,7 +14,7 @@ import java.util.Random;
 import com.colingodsey.quic.packet.InitialPacket;
 import com.colingodsey.quic.packet.Packet;
 import com.colingodsey.quic.packet.Packet.Type;
-import com.colingodsey.quic.packet.components.ConnectionID;
+import com.colingodsey.quic.packet.component.ConnectionID;
 import com.colingodsey.quic.packet.frame.Crypto;
 import com.colingodsey.quic.utils.Utils;
 

@@ -1,4 +1,4 @@
-package com.colingodsey.quic.packet.components;
+package com.colingodsey.quic.packet.component;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;

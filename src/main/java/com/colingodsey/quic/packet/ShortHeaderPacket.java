@@ -2,7 +2,7 @@ package com.colingodsey.quic.packet;
 
 import io.netty.buffer.ByteBuf;
 
-import com.colingodsey.quic.packet.components.ConnectionID;
+import com.colingodsey.quic.packet.component.ConnectionID;
 
 public abstract class ShortHeaderPacket extends Packet {
     boolean spin;

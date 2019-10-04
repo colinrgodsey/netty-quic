@@ -1,16 +1,14 @@
 package com.colingodsey.quic;
 
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelConfig;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOption;
 
-import java.nio.ByteBuffer;
+import java.util.function.Consumer;
 
-import com.colingodsey.quic.config.TransportConfig;
 import com.colingodsey.quic.crypto.context.CryptoContext;
-import com.colingodsey.quic.packet.components.ConnectionID;
+import com.colingodsey.quic.packet.component.ConnectionID;
 
 public class QUIC {
     /*public static final ChannelOption<CryptoContext> INITIAL_SECRETS = ChannelOption.valueOf("QUIC_INITIAL_SECRETS");
@@ -30,6 +28,7 @@ public class QUIC {
     public static final ChannelOption<Long> ACK_DELAY_EXPONENT = ChannelOption.valueOf("QUIC_ACK_DELAY_EXPONENT");
     public static final ChannelOption<Long> MAX_ACK_DELAY = ChannelOption.valueOf("QUIC_MAX_ACK_DELAY");
     public static final ChannelOption<Boolean> DISABLE_MIGRATION = ChannelOption.valueOf("QUIC_DISABLE_MIGRATION");
+    public static final ChannelOption<Object> PREFERRED_ADDRESS = ChannelOption.valueOf("QUIC_PREFERRED_ADDRESS");
     public static final ChannelOption<Long> ACTIVE_CONNECTION_ID_LIMIT = ChannelOption.valueOf("QUIC_ACTIVE_CONNECTION_ID_LIMIT");
 
     public interface Config extends ChannelConfig {
@@ -63,6 +62,7 @@ public class QUIC {
             int getAckDelayExponent();
             int getMaxAckDelay();
             boolean isDisableMigration();
+            //todo: pref addr
             int getActiveConnectionIdLimit();
 
             interface Immutable extends Transport {}
@@ -82,6 +82,14 @@ public class QUIC {
                 void setMaxAckDelay(long maxAckDelay);
                 void setDisableMigration(boolean disableMigration);
                 void setActiveConnectionIdLimit(long activeConnectionIdLimit);
+            }
+
+            interface Accessor {
+                long getOptionLong(ChannelOption<Long> option);
+                void setOptionLong(ChannelOption<Long> option, long value);
+                <T> T getOption(ChannelOption<T> option);
+                <T> void setOption(ChannelOption<T> option, T value);
+                void produceDirty(Consumer<ChannelOption<?>> consumer);
             }
         }
     }

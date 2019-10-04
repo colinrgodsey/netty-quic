@@ -2,102 +2,142 @@ package com.colingodsey.quic.config;
 
 import static com.colingodsey.quic.QUIC.*;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelOption;
 
-import java.nio.ByteBuffer;
 import java.text.MessageFormat;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.ObjLongConsumer;
+import java.util.function.ToLongFunction;
 
 import com.colingodsey.quic.QUIC;
-import com.colingodsey.quic.crypto.TLS;
-import com.colingodsey.quic.crypto.TLS.TransportParams;
-import com.colingodsey.quic.packet.components.ConnectionID;
-import com.colingodsey.quic.utils.VariableInt;
+import com.colingodsey.quic.packet.component.ConnectionID;
 
-//TODO: package-protected access class ?
 public class TransportConfig {
-    final ChannelOption<?>[] OPTIONS = new ChannelOption<?>[] {
-        ORIGINAL_CONNECTION_ID, IDLE_TIMEOUT, STATELESS_RESET_TOKEN,
-        MAX_PACKET_SIZE, MAX_DATA, MAX_STREAM_DATA_BIDI_LOCAL,
-        MAX_STREAM_DATA_BIDI_REMOTE, MAX_STREAM_DATA_UNI,
-        ACK_DELAY_EXPONENT, MAX_ACK_DELAY, DISABLE_MIGRATION,
-        ACTIVE_CONNECTION_ID_LIMIT
-    };
+    static final Map<ChannelOption<?>, Accessor<?>> accessors = new HashMap<>();
 
-    static public class Remote extends Core implements QUIC.Config.Transport.Immutable, TLS.TransportParams.ValueConsume {
-        public void consumeTLS(ByteBuf data) {
-            boolean disableMigration = false;
-            while (data.isReadable()) {
-                final TransportParams key = TransportParams.get(data.readUnsignedShort());
-                switch (key) {
-                    case original_connection_id: {
-                        setOriginalConnectionID(ConnectionID.read(data));
-                        break;
-                    }
-                    case stateless_reset_token: {
-                        byte[] bytes = new byte[16];
-                        data.readBytes(bytes);
-                        setStatelessResetToken(bytes);
-                        break;
-                    }
-                    case disable_migration:
-                        disableMigration = true;
-                        break;
-                    //case preferred_address: //TODO: Preferred Address format
-                    //    throw new UnsupportedOperationException();
-                    default:
-                        setOptionLong(key.option, VariableInt.read(data));
-                }
+    static {
+        addAccessorO(ORIGINAL_CONNECTION_ID, Core::getOriginalConnectionID, Core::setOriginalConnectionID);
+        addAccessor(IDLE_TIMEOUT, Core::getIdleTimeout, Core::setIdleTimeout);
+        addAccessorO(STATELESS_RESET_TOKEN, Core::getStatelessResetToken, Core::setStatelessResetToken);
+        addAccessor(MAX_PACKET_SIZE, Core::getMaxPacketSize, Core::setMaxPacketSize);
+        addAccessor(MAX_DATA, Core::getMaxData, Core::setMaxData);
+        addAccessor(MAX_STREAM_DATA_BIDI_LOCAL, Core::getMaxStreamDataBiDiLocal, Core::setMaxStreamDataBiDiLocal);
+        addAccessor(MAX_STREAM_DATA_BIDI_REMOTE, Core::getMaxStreamDataBiDiRemote, Core::setMaxStreamDataBiDiRemote);
+        addAccessor(MAX_STREAM_DATA_UNI, Core::getMaxStreamDataUni, Core::setMaxStreamDataUni);
+        addAccessor(ACK_DELAY_EXPONENT, Core::getAckDelayExponent, Core::setAckDelayExponent);
+        addAccessor(MAX_ACK_DELAY, Core::getMaxAckDelay, Core::setMaxAckDelay);
+        addAccessorO(DISABLE_MIGRATION, Core::isDisableMigration, Core::setDisableMigration);
+        //addAccessor(PREFERRED_ADDRESS);
+        addAccessor(ACTIVE_CONNECTION_ID_LIMIT, Core::getActiveConnectionIdLimit, Core::setActiveConnectionIdLimit);
+    }
+
+    static void addAccessor(ChannelOption<Long> option0,
+            ToLongFunction<Core> getter0,
+            ObjLongConsumer<Core> setter0) {
+        accessors.put(option0, new Accessor<Long>() {
+            final ToLongFunction<Core> getter = getter0;
+            final ObjLongConsumer<Core> setter = setter0;
+
+            public Long get(Core core) {
+                return getter.applyAsLong(core);
             }
-            setDisableMigration(disableMigration);
+
+            public long getLong(Core core) {
+                return getter.applyAsLong(core);
+            }
+
+            public void set(Core core, Long value) {
+                setter.accept(core, value);
+            }
+
+            public void setLong(Core core, long value) {
+                setter.accept(core, value);
+            }
+        });
+    }
+
+    static <T> void addAccessorO(ChannelOption<T> option0,
+            Function<Core, T> getter0,
+            BiConsumer<Core, T> setter0) {
+        accessors.put(option0, new Accessor<T>() {
+            final Function<Core, T>getter = getter0;
+            final BiConsumer<Core, T> setter = setter0;
+
+            public T get(Core core) {
+                return getter.apply(core);
+            }
+
+            public long getLong(Core core) {
+                return (Long) getter.apply(core);
+            }
+
+            public void set(Core core, T value) {
+                setter.accept(core, value);
+            }
+
+            @SuppressWarnings("unchecked")
+            public void setLong(Core core, long value) {
+                setter.accept(core, (T) (Long) value);
+            }
+        });
+    }
+
+    static class Remote extends Core implements QUIC.Config.Transport.Immutable,
+            QUIC.Config.Transport.Accessor {
+        public long getOptionLong(ChannelOption<Long> option) {
+            return accOf(option).getLong(this);
         }
 
-        public void consumeTLS(ByteBuffer data) {
-            if (data != null) {
-                consumeTLS(Unpooled.wrappedBuffer(data));
-            }
+        public void setOptionLong(ChannelOption<Long> option, long value) {
+            accOf(option).setLong(this, value);
         }
-        
+
+        public <T> T getOption(ChannelOption<T> option) {
+            return accOf(option).get(this);
+        }
+
+        public <T> void setOption(ChannelOption<T> option, T value) {
+            accOf(option).set(this, value);
+        }
+
+        public void produceDirty(Consumer<ChannelOption<?>> consumer) {
+            // NOOP
+        }
+
         protected void dirty(ChannelOption<?> option) {
             // NOOP
         }
     }
 
-    static public class Local extends Core implements QUIC.Config.Transport.Mutable, TLS.TransportParams.ValueProduce {
+    @SuppressWarnings("unchecked")
+    static <T> Accessor<T> accOf(ChannelOption<T> option) {
+        return (Accessor<T>) accessors.get(option);
+    }
+
+    static class Local extends Core implements QUIC.Config.Transport.Mutable,
+            QUIC.Config.Transport.Accessor {
         ConcurrentHashMap<ChannelOption<?>, Object> dirtySet = new ConcurrentHashMap<>();
 
-        public ByteBuffer produceDirtyTLS() {
-            final ByteBuf buffer = Unpooled.buffer(64);
+        public long getOptionLong(ChannelOption<Long> option) {
+            return accOf(option).getLong(this);
+        }
 
-            produceDirty(option -> {
-                if (option == DISABLE_MIGRATION && !isDisableMigration()) {
-                    return;
-                }
+        public void setOptionLong(ChannelOption<Long> option, long value) {
+            accOf(option).setLong(this, value);
+        }
 
-                buffer.writeShort(TransportParams.get(option).id);
-                if (option == ORIGINAL_CONNECTION_ID) {
-                    getOriginalConnectionID().write(buffer);
-                } else if (option == STATELESS_RESET_TOKEN) {
-                    buffer.writeBytes(getStatelessResetToken());
-                } else if (option == DISABLE_MIGRATION) {
-                    // no value here
-                /*} else if (option == preferred_address) {
+        public <T> T getOption(ChannelOption<T> option) {
+            return accOf(option).get(this);
+        }
 
-                }*/
-                } else {
-                    VariableInt.write(getOptionLong(option), buffer);
-                }
-            });
-
-            if (buffer.isReadable()) {
-                return buffer.nioBuffer();
-            } else {
-                return null;
-            }
+        public <T> void setOption(ChannelOption<T> option, T value) {
+            accOf(option).set(this, value);
         }
 
         public void produceDirty(Consumer<ChannelOption<?>> consumer) {
@@ -112,10 +152,6 @@ public class TransportConfig {
         protected void dirty(ChannelOption<?> option) {
             dirtySet.put(option, this);
         }
-    }
-
-    static public abstract class LocalProducer {
-
     }
 
     static abstract class Core {
@@ -251,6 +287,7 @@ public class TransportConfig {
             dirty(MAX_STREAMS_UNI);
         }
 
+        //TODO: some of these can only be set once
         public void setAckDelayExponent(long ackDelayExponent) {
             checkArgument(1, 20, ackDelayExponent, "ackDelayExponent");
             this.ackDelayExponent = (int) ackDelayExponent;
@@ -273,41 +310,6 @@ public class TransportConfig {
             dirty(ACTIVE_CONNECTION_ID_LIMIT);
         }
 
-        boolean setOptionLong(ChannelOption<?> option, long value) {
-            if (option == IDLE_TIMEOUT) setIdleTimeout(value);
-            else if (option == MAX_PACKET_SIZE) setMaxPacketSize(value);
-            else if (option == MAX_DATA) setMaxData(value);
-            else if (option == MAX_STREAM_DATA_BIDI_LOCAL) setMaxStreamDataBiDiLocal(value);
-            else if (option == MAX_STREAM_DATA_BIDI_REMOTE) setMaxStreamDataBiDiRemote(value);
-            else if (option == MAX_STREAM_DATA_UNI) setMaxStreamsUni(value);
-            else if (option == MAX_STREAMS_BIDI) setMaxStreamsBiDi(value);
-            else if (option == MAX_STREAMS_UNI) setMaxStreamsUni(value);
-            else if (option == ACK_DELAY_EXPONENT) setAckDelayExponent(value);
-            else if (option == MAX_ACK_DELAY) setMaxAckDelay(value);
-            else if (option == ACTIVE_CONNECTION_ID_LIMIT) setActiveConnectionIdLimit(value);
-            else {
-                return false;
-            }
-            return true;
-        }
-
-        long getOptionLong(ChannelOption<?> option) {
-            if (option == IDLE_TIMEOUT) return getIdleTimeout();
-            else if (option == MAX_PACKET_SIZE) return getMaxPacketSize();
-            else if (option == MAX_DATA) return getMaxData();
-            else if (option == MAX_STREAM_DATA_BIDI_LOCAL) return getMaxStreamDataBiDiLocal();
-            else if (option == MAX_STREAM_DATA_BIDI_REMOTE) return getMaxStreamDataBiDiRemote();
-            else if (option == MAX_STREAM_DATA_UNI) return getMaxStreamsUni();
-            else if (option == MAX_STREAMS_BIDI) return getMaxStreamsBiDi();
-            else if (option == MAX_STREAMS_UNI) return getMaxStreamsUni();
-            else if (option == ACK_DELAY_EXPONENT) return getAckDelayExponent();
-            else if (option == MAX_ACK_DELAY) return getMaxAckDelay();
-            else if (option == ACTIVE_CONNECTION_ID_LIMIT) return getActiveConnectionIdLimit();
-            else {
-                return -1;
-            }
-        }
-
         static void checkArgument(long min, long max, long value, String fieldName) {
             if (value < min || value > max) {
                 final MessageFormat msg = new MessageFormat(
@@ -317,5 +319,12 @@ public class TransportConfig {
                         msg.format(new Object[] {value, fieldName, min, max}));
             }
         }
+    }
+
+    interface Accessor<T> {
+        T get(Core core);
+        long getLong(Core core);
+        void set(Core core, T value);
+        void setLong(Core core, long value);
     }
 }

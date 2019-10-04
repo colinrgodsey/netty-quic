@@ -7,7 +7,7 @@ import java.util.List;
 
 import com.colingodsey.quic.QUIC;
 import com.colingodsey.quic.packet.frame.Stream;
-import com.colingodsey.quic.pipeline.components.FrameOrdering;
+import com.colingodsey.quic.pipeline.component.FrameOrdering;
 
 public class StreamOrdering extends MessageToMessageCodec<Stream, Stream> {
     protected FrameOrdering<Stream> inQueue = new FrameOrdering<>();
